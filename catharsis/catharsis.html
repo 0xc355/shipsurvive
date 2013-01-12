@@ -1,0 +1,297 @@
+<html>
+<head>
+
+<style media="screen" type="text/css">
+canvas, img {
+    image-rendering: optimizeSpeed;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: optimize-contrast;
+    -ms-interpolation-mode: nearest-neighbor;
+    border: 1px solid #ddd;
+}
+canvas#b { } /* 4 * 64 = 256 */
+</style>
+</head>
+<body>
+<canvas id='b' width='528' height='464'></canvas>
+
+  <script type="text/javascript" src="js/FrameTimer.js"></script>
+    <script type="text/javascript" src="js/SpriteSheet.js"></script>
+    <script type="text/javascript" src="js/Animation.js"></script>
+    <script type="text/javascript">
+    
+
+//////frametimer stuff?
+    var timer = new FrameTimer();
+            timer.tick();
+ 
+            var sprites = new SpriteSheet({
+                width: 5*4,
+                height: 3*4,
+                sprites: [
+                    { name: 'stand' },
+                    { name: 'eat'},
+                ]
+            });
+            var walk = new Animation([
+                    { sprite: 'stand', time: 1 },
+                    { sprite: 'eat', time: 1 },
+            ], sprites);
+            var birdImage = new Image();
+ 
+            
+ 
+            birdImage.src = 'images/bird_sheet4x.png';
+
+
+//////set up canvas to not smooth pixels
+var canvas = document.getElementById('b');
+var ctx = document.getElementById('b').getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        ctx.webkitImageSmoothingEnabled = false;
+        ctx.mozImageSmoothingEnabled = false;
+
+
+//load Background image
+var bgReady = false;
+var bgImage = new Image();
+bgImage.onload = function () {
+	bgReady = true;
+};
+bgImage.src = "images/background.png";
+
+//load hero image
+var heroReady = false;
+var heroImage = new Image();
+heroImage.onload = function () {
+	heroReady = true;
+};
+heroImage.src = "images/hero.png";
+heroImage.width = 40;
+heroImage.height = 68;
+
+
+
+//load cloud image
+var cloudReady = false;
+var cloudImage = new Image();
+cloudImage.onload = function () {
+	cloudReady = true;
+};
+cloudImage.src = "images/cloud1.png";
+cloudImage.height = 26;
+cloudImage.width = 112;
+
+//load birds
+var birdReady = true;
+
+
+
+
+
+
+
+//////////Game objects
+
+
+//game over variable
+var gameOver = false;
+
+//this is the player
+var hero = {
+  speed: 250, //movement in pixels per second
+  x: 0,
+  y: 0,
+  box:{width: heroImage.width, height: heroImage.height}
+};
+
+
+
+
+
+
+
+
+    
+var resetRandom = function (obj) {
+	//Throw the monster somewhere on the screen
+	obj.x = obj.box.width + (Math.random() * (canvas.width - obj.box.width * 2));
+    obj.y = obj.box.height + (Math.random() * (canvas.height - obj.box.height * 2));
+};
+
+    
+    
+    
+///create clouds array
+clouds = [];
+
+///this spawns the clouds into the array
+var spawnClouds = function (){
+  for (i = 0; i < 20; i++) {
+    var cloud = {
+      x: 0,
+      y: 0
+      };
+    //create a lot of monsters
+    cloud.box = {width: 31, height:25};
+    resetRandom(cloud);
+    clouds.push(cloud);
+  
+  }
+};
+
+///spawn clouds intially
+spawnClouds();
+
+
+
+
+
+///create birds array
+birds = [];
+
+///this spawns the birds into the array
+var spawnBirds = function (){
+  for (i = 0; i < 20; i++) {
+    var bird = {
+      x: 0,
+      y: 0
+      };
+    //create a lot of birds
+    bird.box = {width: 31, height:25};
+    resetRandom(bird);
+    birds.push(bird);
+  
+  }
+};
+
+///spawn birds intially
+spawnBirds();
+
+
+///collision detected?
+function intersectsBox(objA, objB) {
+  if (objB.x <= (objA.x + objA.box.width)
+		&& objA.x <= (objB.x + objB.box.width)
+		&& objB.y <= (objA.y + objA.box.height)
+		&& objA.y <= (objB.y + objB.box.height))
+          return true;
+}
+
+
+
+
+
+
+
+
+randomNumber = 0;
+
+
+
+//Handle keyboard controls
+var keysDown = {};
+
+addEventListener("keydown", function (e) {
+	keysDown[e.keyCode] = true;
+}, false);
+
+addEventListener("keyup", function (e) {
+	delete keysDown[e.keyCode];
+}, false);
+
+
+       
+//Update game objects 
+var update = function (modifier) {
+
+    
+
+
+
+ //bind keyboard controls   
+	if (38 in keysDown) { //player holding up
+		hero.y -= hero.speed * modifier;
+	}
+	if (40 in keysDown) { //player holding down
+		hero.y += hero.speed * modifier;
+	}
+	if (37 in keysDown) { //player holding left
+				heroImage.src = "images/hero.png";
+
+		hero.x -= hero.speed * modifier;
+	}
+	if (39 in keysDown) { //player holding right
+		hero.x += hero.speed * modifier;
+	}
+  	
+  
+  
+    
+  
+  };
+
+
+
+//Draw everything
+var render = function () {
+	if (bgReady) {
+		ctx.drawImage(bgImage, 0, 0, 528, 464);
+	}
+	if (gameOver) {
+		heroReady = false;
+		ctx.fillText("You starved to death!", 325, 290);
+	}
+		else if (heroReady) {
+				ctx.drawImage(heroImage, hero.x, hero.y, heroImage.width, heroImage.height);
+			}		
+	
+	if (cloudReady) {
+      for (i = 0; i < clouds.length; i++) {
+		ctx.drawImage(cloudImage, clouds[i].x, clouds[i].y, cloudImage.width, cloudImage.height);
+      }
+      
+}
+	//Score
+	//ctx.fillStyle = "rgb(0, 0, 0)";
+	//ctx.font = "bold 30 px Helvetica";
+	//ctx.textAlign = "left";
+	//ctx.textBaseline = "top";
+	//ctx.fillText("Sheep consumed: " + , 27, 32);
+	//ctx.fillText("Press SPACE to eat sheep!", 27, 64);
+	//ctx.fillText("Meter", 27, 595);
+
+	    
+    //sprite sheet animation test
+    setInterval(function(){
+        walk.animate(timer.getSeconds());
+   		var frame = walk.getSprite();
+		if (birdReady) {
+      		for (i = 0; i < clouds.length; i++) {
+        		ctx.drawImage(birdImage, frame.x, frame.y, 5*4, 3*4, birds[i].x, birds[i].y, 5*4, 3*4)
+        	}
+        }
+     	timer.tick();
+    }, 5);         
+};
+
+//Main game loop
+var main = function () {
+	var now = Date.now();
+	var delta = now - then;
+	
+	update(delta / 1000);
+	render();
+	
+	then = now;
+};
+
+//Play
+var then = Date.now();
+setInterval(main, 5); //execute as fast as possible
+
+ </script>
+</body>
+
+</html>
