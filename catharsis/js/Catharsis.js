@@ -113,15 +113,17 @@
 ///this spawns the birds into the array
     var spawnBirds = function () {
         for (var i = 0; i < 20; i++) {
+            var speed = .2;
             var bird = {
                 x: 0,
                 y: 0,
                 walk: new Animation([
-                { sprite:'stand', time:1 },
-                { sprite:'eat', time:1 }], sprites)
+                { sprite:'stand', time:speed },
+                { sprite:'eat', time:speed }], sprites)
             };
             //create a lot of birds
             bird.box = {width:31, height:25};
+            bird.walk.animate(Math.random() * .2);
             resetRandom(bird);
             birds.push(bird);
         }
