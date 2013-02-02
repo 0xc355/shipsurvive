@@ -6,9 +6,18 @@
 
 	<link rel="stylesheet" media="screen" type="text/css" href="css/styles.css" />
 	<link href='http://fonts.googleapis.com/css?family=Open+Sans:300,600,700' rel='stylesheet' type='text/css'>
+	<link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/themes/base/jquery-ui.css"
+		rel="stylesheet" type="text/css"/>
 	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.js"></script>
+	<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8/jquery-ui.min.js"></script>
 	<script type="text/javascript" src="js/rhill-voronoi-core.js"></script>
+	<script type="text/javascript" src="js/perlin-noise-simplex.js"></script>
+	<script type="text/javascript" src="js/pressure.js"></script>
 	<script type="text/javascript" src="js/mapgen.js"></script>
+	<style type="text/css">
+		#size_slider { margin: 10px; }
+		#noise_slider { margin: 10px; }
+	</style>
 </head>
 
 <body>
@@ -27,9 +36,31 @@
 					<p>Unfortunately, your browser does not seem to support the canvas element.</p>
 				</canvas>
 				<noscript>
-					<p>Unfortunately, your javascript is disabled. You will need to enable it in order to play the game.</p>
+					<p>Unfortunately, your javascript is disabled.</p>
 				</noscript>
 			</div>
+		</section>
+		<section class="row">
+			<div class="sixcol">
+			<p id="size_display">Size: 1</p>
+			</div>
+			<div class="sixcol last">
+
+			</div>
+		</section>
+		<section class="row">
+			<div class="sevencol" id="size_slider"></div>
+		</section>
+		<section class="row">
+			<div class="sixcol">
+			<p id="noise_display">Noise: 1</p>
+			</div>
+			<div class="sixcol last">
+
+			</div>
+		</section>
+		<section class="row">
+			<div class="sevencol" id="noise_slider"></div>
 		</section>
 	</div>
 </body>
