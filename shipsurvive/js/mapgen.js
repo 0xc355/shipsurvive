@@ -16,6 +16,8 @@ var core = {
 	init: function() {
 		globals.canvas = $('#board');
 		var cv = globals.canvas[0];
+		
+		globals.room_data = room_data;
 		cv.onselectstart = function () { return false; }
 		globals.context = cv.getContext('2d');
 		globals.context.background = defaults.background;
@@ -64,9 +66,11 @@ var core = {
 		$("p#noise_display").text("Noise: " + val);
 	},
 	generate_map: function() {
-
-	}
-	redraw_map: function(centroids, test_points) {
+		mapgen_functions.generate_room_graph(50);
+		core.redraw_map();
+	},
+	redraw_map: function() {
+		draw_functions.draw_border(globals.context, 2);
 	},
 	hiDPIRatio: function() {
 		var devicePixelRatio, backingStoreRatio;
@@ -83,7 +87,7 @@ var core = {
 }
 var utilities = {
 	random_interval : function(a, b) {
-		return Math.round(Math.random() * (b - a) + a);
+		return Math.floor(Math.random() * (b - a) + a);
 	},
 	colormap_jet : function(value) {
 		var interpolate = function (val, y0, x0, y1, x1) {
@@ -104,8 +108,46 @@ var utilities = {
 		return "rgb(" + red + ", " + green + ", " + blue + ")";
 	}
 }
-var mapgen_functions = {
 
+var mapgen_functions = {
+	generate_room_graph: function(min_rooms) {
+		var rooms = [];
+		var types_added = {};
+		var tWeight = 0;
+		
+		//first fill the graph with minimal rooms
+		for (var i = 0; i < globals.room_data.length; i++) {
+			var room_type = room_data[i];
+			types_added[room_type.name] = 0;
+			tWeight += room_type.rarity;
+			room_type.cWeight = tWeight;
+			for (var j = 0; j < room_type.min; j++) {
+				rooms.push(room_type.name);
+				types_added[room_type.name] += 1;
+			}
+		}
+
+		function random_room() {
+			var rn = utilities.random_interval(0, tWeight);
+			for (var i = 0; i < globals.room_data.length; i++) {
+					var room_type = room_data[i];
+					if (room_type.cWeight >= rn) {
+						return room_type;
+					}
+			}
+			return room_data[room_data.length]
+		}
+		
+		//add rooms until the min_rooms parameter has been exceeded
+		while(rooms.length < min_rooms) {
+			var room_type = random_room();
+			if (!room_type.max || types_added[room_type.name] < room_type.max) {
+				rooms.push(room_type.name);
+				types_added[room_type.name] += 1;
+			}
+		}
+		console.log(rooms);
+	}
 }
 var draw_functions = {
 	draw_border : function(ctx, width) {
