@@ -24,18 +24,16 @@ var core = {
 		globals.context = cv.getContext('2d');
 		globals.context.background = defaults.background;
 		globals.params = {noise_size: 1, radius_size:9};
-		globals.bounds = {
-			start_x: 5, start_y: 5,
-			end_x: globals.canvas[0].width-5,
-			end_y: globals.canvas[0].height-5
-		};
-		globals.size = {
-			width: (globals.bounds.end_x - globals.bounds.start_x),
-			height: (globals.bounds.end_y - globals.bounds.start_y)
+		globals.screen_bounds = {
+			origin: {x: 0, y: 0},
+			size: {
+				width: globals.canvas[0].width,
+				height: globals.canvas[0].height
+			}
 		};
 		globals.centroid = {
-			x: (globals.bounds.end_x + globals.bounds.start_x)/2,
-			y: (globals.bounds.end_y + globals.bounds.start_y)/2
+			x: (globals.screen_bounds.size.width/2 + globals.screen_bounds.origin.x),
+			y: (globals.screen_bounds.size.height/2 + globals.screen_bounds.origin.y)
 		};
 		globals.keys = {"w":false, "a":false, "s":false, "d":false};
 		globals.room_size = 50;
@@ -130,37 +128,38 @@ var core = {
 		if (evt.keyCode == 68) {globals.keys["d"] = false;}
 	},
 	generate_map: function() {
-		globals.place_next_room = mapg.generate_room_graph(globals.room_size, globals.bounds.width, globals.bounds.height);
+		globals.place_next_room = mapg.generate_room_graph(globals.room_size,
+					globals.bounds.width, globals.bounds.height);
 		var next_size = globals.place_next_room();
 	},
 	next: function () {
 		globals.place_next_room();
 	},
 	toggle_door: function () {
-		var new_origin = {"x":globals.mousePos.x, "y":globals.mousePos.y};
-		new_origin.x += globals.character.origin.x - globals.centroid.x;
-		new_origin.y += globals.character.origin.y - globals.centroid.y;
-
-		var x = Math.floor((new_origin.x)/defaults.grid_width);
-		var y = Math.floor((new_origin.y)/defaults.grid_width);
-		var next_cell = core.check_position(x,y);
-		var dx = next_cell.x - globals.current_cell.x;
-		var dy = next_cell.y - globals.current_cell.y;
-		var distance = Math.sqrt(dx*dx + dy*dy);
-		if (next_cell && next_cell.type == "door" && next_cell != globals.current_cell && distance < 2) {
-			next_cell.passable = !next_cell.passable;
+		var grid_point = core.screen_to_grid_index(globals.mousePos);
+		var next_cell = core.check_position(grid_point.x, grid_point.y);
+		if (next_cell && next_cell.type == "door" && next_cell != globals.current_cell) {
+			var dx = next_cell.x - globals.current_cell.x;
+			var dy = next_cell.y - globals.current_cell.y;
+			var distance = Math.sqrt(dx*dx + dy*dy);
+			if (distance < 2) {
+				next_cell.passable = !next_cell.passable;
+			}
 		}
 	},
 	mouse_debug: function () {
-		var new_origin = {"x":globals.mousePos.x, "y":globals.mousePos.y};
-		new_origin.x += globals.character.origin.x - globals.centroid.x;
-		new_origin.y += globals.character.origin.y - globals.centroid.y;
-
+		var grid_point = core.screen_to_grid_index(globals.mousePos);
+		console.log(grid_point.x, grid_point.y);
+		var next_cell = core.check_position(grid_point.x, grid_point.y);
+		console.log(next_cell);
+	},
+	screen_to_grid_index: function(point) {
+		var new_origin = {}
+		new_origin.x = point.x + globals.character.origin.x - globals.centroid.x;
+		new_origin.y = point.y + globals.character.origin.y - globals.centroid.y;
 		var x = Math.floor((new_origin.x)/defaults.grid_width);
 		var y = Math.floor((new_origin.y)/defaults.grid_width);
-		console.log(x,y);
-		var next_cell = core.check_position(x,y);
-		console.log(next_cell);
+		return {"x":x, "y":y};
 	},
 	redraw_map: function() {
 		draw_functions.draw_bg(globals.context);
@@ -168,8 +167,19 @@ var core = {
 		var open_door_cells = [];
 		var closed_door_cells = [];
 		var wall_cells = [];
-		for (var y = 0; y < globals.bounds.height; y++) {
-			for (var x = 0; x < globals.bounds.width; x++) {
+		var occluded_cells = [];
+		var screen_end = {
+			x:globals.screen_bounds.origin.x + globals.screen_bounds.size.width,
+			y:globals.screen_bounds.origin.y + globals.screen_bounds.size.height
+		};
+		var view_bounds = {};
+		view_bounds.origin = core.screen_to_grid_index(globals.screen_bounds.origin);
+		view_bounds.end = core.screen_to_grid_index(screen_end);
+		view_bounds.end.x += 1;
+		view_bounds.end.y += 1;
+
+		for (var y = view_bounds.origin.y; y < view_bounds.end.y; y++) {
+			for (var x = view_bounds.origin.x; x < view_bounds.end.x; x++) {
 				var cell = globals.map_grid[mapg.indexof(x,y)];
 				if (cell && cell.type == "door") {
 					if (cell.passable) {
@@ -180,13 +190,18 @@ var core = {
 				} else if (cell && cell.type == "wall") {
 					wall_cells.push(cell);
 				}
+				var o_cell = {x:x,y:y};
+				if (mapg.occluded(globals.current_cell, o_cell)) {
+					occluded_cells.push(o_cell);
+				}
 			}
 		}
 		draw_functions.draw_cells(globals.context, wall_cells,
 					  defaults.grid_width, "rgba(60,60,60,1)");
 		draw_functions.draw_cells(globals.context, closed_door_cells, defaults.grid_width, "rgba(180,0,0,1)");
 		draw_functions.draw_cells(globals.context, open_door_cells, defaults.grid_width, "rgba(0,200,0,1)");
-	
+		draw_functions.draw_cells(globals.context, occluded_cells,
+					  defaults.grid_width, "rgba(0,0,0,.5)", 0);
 		draw_functions.draw_character(globals.context, globals.character);
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
@@ -239,6 +254,35 @@ var core = {
 	}
 }
 var utilities = {
+	bresenham_line : function(a, b) {
+		/**
+		 * does a straight line from a to b
+		 * using bresenham's line algorithm
+		 */
+		var a = {x:a.x, y:a.y};
+		var b = {x:b.x, y:b.y};
+		var dx = Math.abs(b.x - a.x);
+		var dy = Math.abs(b.y - a.y);
+		var sx, sy;
+		if (a.x < b.x) { sx = 1; } else { sx = -1; }
+		if (a.y < b.y) { sy = 1; } else { sy = -1; }
+		var err = dx - dy;
+		var next_cell = function () {
+			var res = {x:a.x, y:a.y};
+			if (a.x == b.x && a.y == b.y) { return undefined; }
+			var e2 = 2 * err;
+			if (e2 > -dy) {
+				err = err - dy;
+				a.x += sx;
+			}
+			if (e2 < dx) {
+				err = err + dx;
+				a.y += sy;
+			}
+			return res;
+		}
+		return next_cell;
+	},
 	random_interval : function(a, b) {
 		return Math.floor(Math.random() * (b - a) + a);
 	},
@@ -272,6 +316,17 @@ var utilities = {
 }
 
 var mapg = {
+	occluded : function (from, to) {
+		var next_cell = utilities.bresenham_line(from, to);
+		var cell = next_cell();
+		while (cell) {
+			if (!globals.map_grid[mapg.indexof(cell)].passable) {
+				return true;
+			}
+			cell = next_cell();
+		}
+		return false;
+	},
 	in_bounds : function (x,y) {
 		if (y != undefined) {
 			return x >= 0 && x < globals.bounds.width && y >= 0 && y < globals.bounds.height;
@@ -626,8 +681,11 @@ var draw_functions = {
 			ctx.strokeRect(startX , startY, width, height);
 		}
 	},
-	draw_cells : function(ctx, cells, cell_width, color) {
-		var line_width = 2;
+	draw_cells : function(ctx, cells, cell_width, color, line_width) {
+		if (line_width == undefined) {
+			line_width =  2;
+		}
+		console.log(line_width);
 		ctx.fillStyle = color;
 		for (var i = 0; i < cells.length; i++) {
 			var cell = cells[i];
@@ -646,6 +704,7 @@ var draw_functions = {
 		var y2 = globals.centroid.y + Math.sin(character.facing + 2.35619449) * 5;
 		var x3 = globals.centroid.x + Math.cos(character.facing - 2.35619449) * 5;
 		var y3 = globals.centroid.y + Math.sin(character.facing - 2.35619449) * 5;
+		ctx.strokeStyle = "#000000";
 		ctx.beginPath();
 		ctx.moveTo(x1,y1);
 		ctx.lineTo(x2,y2);
