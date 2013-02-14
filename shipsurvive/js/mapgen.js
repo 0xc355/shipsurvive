@@ -5,7 +5,7 @@ var globals = {},
 defaults = {
 	background: 'white',
 	grid_offset:{"x":0, "y":0},
-	grid_width: 150,
+	grid_width: 20,
 	font: '14px Arial',
 	num_seed_points: 1500,
 },
@@ -56,6 +56,7 @@ var core = {
 		globals.mousePos = {"x":0, "y":0};
 		globals.room_types = {};
 		//cv.addEventListener('click', core.generate_map, true);
+		cv.addEventListener('click', core.next, true);
 		cv.addEventListener('keydown', core.keydown_handler, true);
 		cv.addEventListener('keyup', core.keyup_handler, true);
 		cv.setAttribute('tabindex','0');
@@ -71,7 +72,7 @@ var core = {
 
 		core.generate_map();
 		
-		var start_room = globals.rooms[utilities.random_interval(0,globals.rooms.length)];
+		var start_room = globals.rooms[0];
 		var start_origin = start_room.origin;
 		var c_origin = {"x":start_origin.x * defaults.grid_width,
 					"y":start_origin.y * defaults.grid_width};
@@ -115,7 +116,6 @@ var core = {
 		$("p#noise_display").text("Cell Length: " + val);
 	},
 	keydown_handler: function (evt) {
-		console.log(evt.keyCode);
 		if (evt.keyCode == 87) {globals.keys["w"] = true;} 
 		if (evt.keyCode == 65) {globals.keys["a"] = true;}
 		if (evt.keyCode == 83) {globals.keys["s"] = true;}
@@ -129,16 +129,27 @@ var core = {
 	},
 	generate_map: function() {
 		globals.place_next_room = mapg.generate_room_graph(globals.room_size, globals.bounds.width, globals.bounds.height);
-		var size = 0;
 		var next_size = globals.place_next_room();
-		while (size != next_size) {
-			size = next_size;
-			next_size = globals.place_next_room();
-		}
+	},
+	next: function () {
+		globals.place_next_room();
 	},
 	redraw_map: function() {
 		draw_functions.draw_bg(globals.context);
 		draw_functions.draw_rooms(globals.context, globals.rooms, defaults.grid_width, 1);
+		draw_functions.draw_cells(globals.context, globals.open_cells.entries(), defaults.grid_width, "rgba(0,0,255,.5)");
+		draw_functions.draw_cells(globals.context, globals.walls.entries(), defaults.grid_width, "rgba(0,255,0,.5)");
+		var room_cells = [];
+		for (var y = 0; y < globals.bounds.height; y++) {
+			for (var x = 0; x < globals.bounds.width; x++) {
+				var cell = globals.map_grid[mapg.indexof(x,y)];
+				if (cell && cell.type == "room") {
+					room_cells.push(cell);
+				}
+			}
+		}
+		draw_functions.draw_cells(globals.context, room_cells, defaults.grid_width, "rgba(255,0,0,.5)");
+		
 		draw_functions.draw_character(globals.context, globals.character);
 		if (globals.current_room) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_room);
@@ -166,13 +177,28 @@ var core = {
 			}
 			return undefined;
 		}
-		if (globals.keys.w) { globals.character.origin.y -= dt * 100; }
-		if (globals.keys.a) { globals.character.origin.x -= dt * 100; }
-		if (globals.keys.s) { globals.character.origin.y += dt * 100; }
-		if (globals.keys.d) { globals.character.origin.x += dt * 100; }
-		var x = Math.floor((globals.character.origin.x)/defaults.grid_width);
-		var y = Math.floor((globals.character.origin.y)/defaults.grid_width);
-		globals.current_room = checkPos(x,y);
+		var new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
+		if (globals.keys.w) { new_origin.y -= dt * 100; }
+		if (globals.keys.s) { new_origin.y += dt * 100; }
+		var x = Math.floor((new_origin.x)/defaults.grid_width);
+		var y = Math.floor((new_origin.y)/defaults.grid_width);
+		var next_room = checkPos(x,y);
+		if (next_room && next_room.passable) {
+			globals.character.origin.x = new_origin.x;
+			globals.character.origin.y = new_origin.y;
+			globals.current_room = next_room;
+		}
+		new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
+		if (globals.keys.a) { new_origin.x -= dt * 100; }
+		if (globals.keys.d) { new_origin.x += dt * 100; }
+		x = Math.floor((new_origin.x)/defaults.grid_width);
+		y = Math.floor((new_origin.y)/defaults.grid_width);
+		next_room = checkPos(x,y);
+		if (next_room && next_room.passable) {
+			globals.character.origin.x = new_origin.x;
+			globals.character.origin.y = new_origin.y;
+			globals.current_room = next_room;
+		}
 	}
 }
 var utilities = {
@@ -325,6 +351,14 @@ var mapg = {
 				console.log("can't place room");
 				return false;
 			}
+
+			for (var y = r_room.origin.y; y < r_room.origin.y + r_room.dimensions.height; y++) {
+				for (var x = r_room.origin.x; x < r_room.origin.x + r_room.dimensions.width; x++) {
+					var cell = map_grid[mapg.indexof(x,y)];
+					console.log(cell);
+				}
+			}
+
 			room.origin = r_room.origin;
 			room.dimensions = r_room.dimensions;
 			for (var y = room.origin.y; y < room.origin.y + room.dimensions.height; y++) {
@@ -333,9 +367,14 @@ var mapg = {
 					var cell = map_grid[index];
 					if (cell) {
 						cells_displaced.add(cell);
-						cell.type = room.type;
+						cell.type = "room";
+						cell.name = room.type;
+					} else {
+						cell = new Cell(x,y);
+						cell.type = "room";
+						cell.name = room.type;
+						map_grid[mapg.indexof(x,y)] = cell;
 					}
-					map_grid[mapg.indexof(x,y)] = room;
 				}
 			}
 			return cells_displaced;
@@ -346,18 +385,18 @@ var mapg = {
 				this.x = x;
 				this.y = y;
 				this.type = "open";
+				this.passable = true;
 			},
 			equals: function(object) {
 				return other.x == x && other.y == y;
 			}
 		});
-		var add_open_cells = function (room, grid) {
+		var add_walls = function (room, grid, wall_set) {
 			var new_cells = [];
-			var good_cells = new JS.Set();
 			if (!room || !room.dimensions || !room.origin) {
-				return good_cells;
+				return;
 			} 
-			for (var y = room.origin.y; y < room.origin.y + room.dimensions.height; y++) {
+			for (var y = room.origin.y - 1; y < room.origin.y + room.dimensions.height + 1; y++) {
 				var new_cell = new Cell(room.origin.x - 1, y);
 				var new_cell2 = new Cell(room.origin.x + room.dimensions.width, y);
 				new_cells.push(new_cell);
@@ -369,7 +408,6 @@ var mapg = {
 				new_cells.push(new_cell);
 				new_cells.push(new_cell2);
 			}
-			//loop through the new open cells and try to add them to the grid. 
 			for (var i = 0; i < new_cells.length; i++) {
 				var cell = new_cells[i];
 				if (mapg.in_bounds(cell)) {
@@ -377,44 +415,57 @@ var mapg = {
 					var grid_cell = grid[grid_index];
 					if (!grid_cell) {
 						grid[grid_index] = cell;
-						good_cells.add(cell);
+						cell.passable = false;
+						cell.type = "wall";
+						wall_set.add(cell);
 					}
 				}
 			}
-			return good_cells;
 		}
-		var open_cells = [];
+		var add_open_cells = function (room, grid, open_set) {
+			var new_cells = [];
+			if (!room || !room.dimensions || !room.origin) {
+				return;
+			} 
+			for (var y = room.origin.y - 1; y < room.origin.y + room.dimensions.height + 1; y++) {
+				var new_cell = new Cell(room.origin.x - 2, y);
+				var new_cell2 = new Cell(room.origin.x + room.dimensions.width + 1, y);
+				new_cells.push(new_cell);
+				new_cells.push(new_cell2);
+			}
+			for (var x = room.origin.x - 1; x < room.origin.x + room.dimensions.width + 1; x++) {
+				var new_cell = new Cell(x, room.origin.y - 2);
+				var new_cell2 = new Cell(x, room.origin.y + room.dimensions.height + 1);
+				new_cells.push(new_cell);
+				new_cells.push(new_cell2);
+			}
+			//loop through the new open cells and try to add them to the grid. 
+			for (var i = 0; i < new_cells.length; i++) {
+				var cell = new_cells[i];
+				if (mapg.in_bounds(cell)) {
+					var grid_index = mapg.indexof(cell);
+					var grid_cell = grid[grid_index];
+					if (!grid_cell) {
+						open_set.add(cell);
+					}
+				}
+			}
+		}
 		var rooms_placed = 0;
 		var i = 0;
-		
-		var get_open_cells = function (grid) {
-			var cells = [];
-			for (var y = 0; y < height; y++) {
-				for (var x = 0; x < width; x++) {
-					if (grid[mapg.indexof(x,y)]) { continue; }
-					var cellt = new Cell(x,y+1);
-					var cellb = new Cell(x,y-1);
-					var celll = new Cell(x-1,y);
-					var cellr = new Cell(x+1,y);
-					if ((mapg.in_bounds(celll) && grid[mapg.indexof(celll)]) ||
-						(mapg.in_bounds(cellr) && grid[mapg.indexof(cellr)]) || 
-						(mapg.in_bounds(cellt) && grid[mapg.indexof(cellt)]) ||
-						(mapg.in_bounds(cellb) && grid[mapg.indexof(cellb)])) {
-						cells.push(new Cell(x,y));
-					}
-				}
-			}
-			return cells;
-		}
-		
+		globals.walls = new JS.Set();
 		/* place next room callback */
 		var place_next_room = function() {
 			if (i >= rooms.length) {
 				return rooms;
 			}
-			var entries = open_cells;
+			var open_set = new JS.Set();
+			for (var ri = 0; ri < rooms.length; ri++) {	
+				add_open_cells(rooms[ri], map_grid, open_set);
+			}
+			var entries = open_set.entries();
 			var room = rooms[i];
-			if (open_cells.length == 0) {
+			if (entries.length == 0) {
 				//if no rooms has been placed, place the first one in the center
 				room.dimensions = {};
 				room.dimensions.width = utilities.random_interval(1,3);
@@ -445,8 +496,8 @@ var mapg = {
 					break;
 				}
 			}
-			open_cells = get_open_cells(map_grid);
-			globals.open_cells = open_cells;
+			add_walls(room, map_grid, globals.walls);
+			globals.open_cells = open_set;
 			globals.map_grid = map_grid;
 			globals.rooms = rooms;
 			i += 1;
@@ -459,7 +510,7 @@ var mapg = {
 var draw_functions = {
 	draw_bg : function(ctx) {
 		var cv = globals.canvas[0];
-		ctx.fillStyle = "#000000";
+		ctx.fillStyle = "#FFFFFF"//"#000000";
 		ctx.fillRect(0, 0, cv.width, cv.height);
 	},
 	draw_border : function(ctx, width) {
@@ -491,14 +542,14 @@ var draw_functions = {
 			ctx.strokeRect(startX , startY, width, height);
 		}
 	},
-	draw_cells : function(ctx, cells, origin, cell_width) {
+	draw_cells : function(ctx, cells, cell_width, color) {
 		var line_width = 2;
+		ctx.fillStyle = color;
 		for (var i = 0; i < cells.length; i++) {
 			var cell = cells[i];
-			ctx.fillStyle = "rgb(100,150,255)";
-			var startX = origin.x + cell.x * cell_width;
+			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
+			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
 			var width =  cell_width;
-			var startY = origin.y + cell.y * cell_width;
 			var height = cell_width;			
 			ctx.fillRect(startX + line_width, startY + line_width,
 					width - line_width * 2, height - line_width * 2);
@@ -547,11 +598,13 @@ var draw_functions = {
 			}
 			return phraseArray;
 		}
+		if (!room || !room.type) {
+			return;
+		}
 
-		console.log(room);
 		var startX = start.x + offset.x;
 		var startY = start.y + offset.y;
-		var name_str = room.name.replace("_"," ");
+		var name_str = room.type.replace("_"," ");
 		var lines = getLines(ctx, name_str, 200);
 		var lineHeight = 14;
 		var maxH = lines.length * lineHeight;
