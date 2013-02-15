@@ -368,19 +368,47 @@ var utilities = {
 var mapg = {
 	a_star: function (from, to) {
 		var hash_cell = function(cell) {
-			return cell.x + ", " + cell.y;
+			return cell.x + cell.y * globals.bounds.width;
 		};
 		var h_func = function(cell) {
 			return Math.abs(to.x - cell.x) + Math.abs(to.y - cell.y);
 		};
+		
 		var closed_set = [];
-		var open_set = [from];
+		var open_set = new PriorityQueue(function(cell) {return -h_func(cell);}, h_func);
+		open_set.push(from);
 		var came_from = {};
 
 		var g_score = {};
 		var f_score = {};
 		g_score[hash_cell(from)] = 0;
 		f_score[hash_cell(from)] = h_func(from);
+		while (open_set) {
+			var best = open_set.pop();
+			var bhash = hash_cell(best);
+			if (hash_cell(bhash) == hash_cell(to)) {
+				return came_from[bhash];
+			}
+			closed_set[hash_cell(best)] = true;
+			var neighbors = cell.neighbors;
+			for (var i = 0; i < neighbors.length; i++) {
+				var other = neighbors[i];
+				var ohash = hash_cell(other);
+				if (closed_set[ohash]) {
+					continue;
+				}
+				var temp_g_score = g_score[bhash] + 1;
+				var added_to_open = open_set.inside(other);
+				if (!added_to_open || temp_g_score < g_score[ohash]) {
+					came_from[ohash] = best;
+					g_score[ohash] = temp_g_score;
+					f_score[ohash] = g_score[ohash] + h_func(other);
+					if (!added_to_open) {
+						
+					}
+				}
+			}
+		}
 	},
 	occluded : function (from, to) {
 		var next_cell = utilities.bresenham_line(from, to);
