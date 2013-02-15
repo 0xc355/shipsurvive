@@ -51,8 +51,12 @@ var core = {
 				if (next_room && next_room.passable) {
 					this.origin.x = new_origin.x;
 					this.origin.y = new_origin.y;
-					this.update_cell();
+					if (!next_room.equals(this.cell)) {
+						this.update_cell();
+					}
+					return this.cell;
 				}
+				return undefined;
 			}
 		});
 	},
@@ -78,7 +82,7 @@ var core = {
 			y: (globals.screen_bounds.size.height/2 + globals.screen_bounds.origin.y)
 		};
 		globals.keys = {"w":false, "a":false, "s":false, "d":false};
-		globals.room_size = 50;
+		globals.room_size = 5;
 		$("#size_slider").slider({max:200, min:10, step:1, value:50, slide:core.change_size});
 		$("#noise_slider").slider({max:40, min:10, step:2, value:20, slide:core.change_noise});
 
@@ -114,7 +118,66 @@ var core = {
 		globals.bounds = {"width": 500, "height": 500};
 
 		core.generate_map();
-		core.add_object({type:"monster"});
+		var hostile = core.add_object("hostile");
+		hostile.random_room();
+		var corner_blocked = function (from, to) {
+			var dx = Math.min(Math.max(to.x - from.x,-1), 1);
+			var dy = Math.min(Math.max(to.y - from.y, -1), 1);
+			//console.log(from, to);
+			//console.log(dx,dy);
+			if (Math.abs(dx) == 1 &&
+			    Math.abs(dy) == 1) {
+				//corner movement, check to make sure not blocked.
+				var horz = globals.map_grid[mapg.indexof(from.x + dx, from.y + 0)];
+				var vert = globals.map_grid[mapg.indexof(from.x + 0, from.y + dy)];
+				if (horz && vert) {
+					if (!horz.passable) {return vert;}
+					if (!vert.passable) {return horz;}
+				}
+			}
+			return undefined;
+		}
+		hostile.recalc_path = function () {
+			this.next_cell = undefined;
+			this.path = mapg.a_star(this.cell, globals.character.cell);
+			if (this.path.length == 0) {
+				this.paused = true;
+			}
+		};
+		hostile.update_function = function (dt) {
+			var angle_to;
+			if (this.paused || !this.cell) { return; }
+			if (!this.next_cell || this.cell.equals(this.next_cell)) {
+				if (!this.path || this.path.length == 0) {
+					this.recalc_path();
+				}
+				if (this.path && this.path.length > 0) {
+					this.next_cell = this.path.pop();
+					var blocked = corner_blocked(this.cell, this.next_cell);
+					if (blocked) {
+						this.path.push(this.next_cell);
+						this.next_cell = blocked;
+					}
+				}
+			}
+			if (this.cell == globals.character.cell) {
+				angle_to = Math.atan2(globals.character.origin.y - this.origin.y,
+							  globals.character.origin.x - this.origin.x);
+				
+			} else if (this.next_cell) {
+				var target = core.grid_to_xy(this.next_cell.x, this.next_cell.y);
+				target.x += defaults.grid_width/2;
+				target.y += defaults.grid_width/2;
+				angle_to = Math.atan2(target.y - this.origin.y,
+							  target.x - this.origin.x);
+			}
+			if (angle_to) {
+				this.facing = angle_to;
+				this.move(Math.cos(angle_to) * this.speed * dt,
+							Math.sin(angle_to) * this.speed * dt);
+			}
+		};
+		hostile.speed = 70;
 
 		globals.character = new core.Actor("player", 0, 0);
 		globals.character.random_room();
@@ -146,8 +209,9 @@ var core = {
 	    	})();
 	},
 	add_object: function(type) {
-		var new_obj = new core.Actor("hostile");
+		var new_obj = new core.Actor(type);
 		globals.objs.push(new_obj);
+		return new_obj;
 	},
 	change_size: function(event, ui) {
 		globals.room_size = Math.round(ui.value);
@@ -179,11 +243,22 @@ var core = {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
 		if (next_cell && next_cell.type == "door" && next_cell != globals.current_cell) {
-			var dx = next_cell.x - globals.current_cell.x;
-			var dy = next_cell.y - globals.current_cell.y;
-			var distance = Math.sqrt(dx*dx + dy*dy);
-			if (distance < 2) {
-				next_cell.passable = !next_cell.passable;
+			var collided = false;
+			for (var i = 0; i < globals.objs.length; i++) {
+				var obj = globals.objs[i];
+				if (next_cell == obj.cell) {
+					collided = true;
+					break;
+				}
+			}
+			if (!collided) {
+				var dx = next_cell.x - globals.current_cell.x;
+				var dy = next_cell.y - globals.current_cell.y;
+				var distance = Math.sqrt(dx*dx + dy*dy);
+				if (distance < 2) {
+					next_cell.passable = !next_cell.passable;
+					core.recalculate_paths();
+				}
 			}
 		}
 	},
@@ -224,14 +299,6 @@ var core = {
 		view_bounds.end.y += 1;
 
 		var angle = Math.atan2(1,0);
-
-		var angular_distance = function(a, b) {
-			var raw = Math.abs(b - a);
-			while (raw > Math.PI * 2) {
-				raw -= Math.PI * 2;
-			}
-			return Math.PI - Math.abs(raw - Math.PI);
-		}
 		for (var y = view_bounds.origin.y; y < view_bounds.end.y; y++) {
 			for (var x = view_bounds.origin.x; x < view_bounds.end.x; x++) {
 				var cell = globals.map_grid[mapg.indexof(x,y)];
@@ -246,16 +313,21 @@ var core = {
 				}
 				var o_cell = {x:x,y:y};
 				var angle = Math.atan2(y - globals.current_cell.y, x - globals.current_cell.x);
-				var a_dist = angular_distance(globals.character.facing, angle);
+				var a_dist = utilities.angular_distance(globals.character.facing, angle);
 				if (y - globals.current_cell.y == 1 && x == globals.current_cell.x) {
-					angular_distance(globals.character.facing, angle);
-					console.log(a_dist);
+					utilities.angular_distance(globals.character.facing, angle);
 				}
 				
 				if (cell != globals.current_cell
 				    && (a_dist > Math.PI/3
 					|| mapg.occluded(globals.current_cell, o_cell))) {
+					var grid_ocell = globals.map_grid[mapg.indexof(o_cell)];
+					if(grid_ocell) {grid_ocell.occluded = true;}
 					occluded_cells.push(o_cell);
+				} else {
+					var grid_ocell = globals.map_grid[mapg.indexof(o_cell)];
+					if(grid_ocell) {grid_ocell.occluded = true;}
+					globals.map_grid[mapg.indexof(o_cell)].occluded = false;
 				}
 			}
 		}
@@ -263,9 +335,14 @@ var core = {
 					  defaults.grid_width, "rgba(60,60,60,1)");
 		draw_functions.draw_cells(globals.context, closed_door_cells, defaults.grid_width, "rgba(180,0,0,1)");
 		draw_functions.draw_cells(globals.context, open_door_cells, defaults.grid_width, "rgba(0,200,0,1)");
+		draw_functions.draw_character(globals.context, globals.character);
+		for (var i = 0; i < globals.objs.length; i++) {
+			var obj = globals.objs[i];
+			if (!obj.cell.occluded)
+				draw_functions.draw_character(globals.context, obj, 10, "#FF0000");
+		}
 		draw_functions.draw_cells(globals.context, occluded_cells,
 					  defaults.grid_width, "rgba(0,0,0,.5)", 0);
-		draw_functions.draw_character(globals.context, globals.character);
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
@@ -282,15 +359,32 @@ var core = {
 				globals.context.backingStorePixelRatio || 1;
 		return devicePixelRatio / backingStoreRatio;
 	},
+	recalculate_paths: function() {
+		for (var i = 0; i < globals.objs.length; i++) {
+			var obj = globals.objs[i];
+			obj.path = [];
+			obj.next_cell = undefined;
+			obj.paused = false;
+		}
+	},
 	update : function(dt) {
 		var new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
 		var dd = {x:0, y:0};
+		var moved = false;
+		var original_cell = globals.character.cell;
 		if (globals.keys.w) { dd.y -= dt * 100; }
 		if (globals.keys.s) { dd.y += dt * 100; }
 		globals.character.move(0, dd.y);
 		if (globals.keys.a) { dd.x -= dt * 100; }
 		if (globals.keys.d) { dd.x += dt * 100; }
-		globals.character.move(dd.x, 0);
+		globals.character.move(dd.x, 0) || moved;
+		if (!original_cell.equals(globals.character.cell)) {
+			core.recalculate_paths();
+		}
+		for (var i = 0; i < globals.objs.length; i++) {
+			var obj = globals.objs[i];
+			obj.update_function(dt);
+		}
 		globals.current_cell = globals.character.cell;
 	},
 	check_position: function (x,y) {
@@ -304,6 +398,23 @@ var core = {
 	}
 }
 var utilities = {
+	angular_distance : function(a, b) {
+		var raw = Math.abs(b - a);
+		while (raw > Math.PI * 2) {
+			raw -= Math.PI * 2;
+		}
+		return Math.PI - Math.abs(raw - Math.PI);
+	},
+	signed_angular_distance : function(a, b) {
+		var dist = utilities.angular_distance(a, b);
+		var d1 = utilities.angular_distance(a + dist, b);
+		var d2 = utilities.angular_distance(a, b + dist);
+		if (d1 > d2) {
+			return -dist;
+		} else {
+			return dist;
+		}
+	},
 	bresenham_line : function(a, b) {
 		/**
 		 * does a straight line from a to b
@@ -375,40 +486,65 @@ var mapg = {
 		};
 		
 		var closed_set = [];
-		var open_set = new PriorityQueue(function(cell) {return -h_func(cell);}, h_func);
+		var open_set = new BinaryHeap(function(cell) {
+			var chash = hash_cell(cell);
+			return f_score[chash];
+		});
+		var tohash = hash_cell(to);
 		open_set.push(from);
 		var came_from = {};
+		var visited_set = [];
+		visited_set[hash_cell(from)] = true;
 
 		var g_score = {};
 		var f_score = {};
 		g_score[hash_cell(from)] = 0;
 		f_score[hash_cell(from)] = h_func(from);
-		while (open_set) {
-			var best = open_set.pop();
-			var bhash = hash_cell(best);
-			if (hash_cell(bhash) == hash_cell(to)) {
-				return came_from[bhash];
-			}
-			closed_set[hash_cell(best)] = true;
-			var neighbors = cell.neighbors;
+
+		var add_neighbors = function(neighbors, cost) {
 			for (var i = 0; i < neighbors.length; i++) {
 				var other = neighbors[i];
-				var ohash = hash_cell(other);
+				var grid_cell = globals.map_grid[mapg.indexof(other)];
+				if (!grid_cell || !grid_cell.passable) {
+					continue;
+				}
+				var ohash = hash_cell(grid_cell);
 				if (closed_set[ohash]) {
 					continue;
 				}
-				var temp_g_score = g_score[bhash] + 1;
-				var added_to_open = open_set.inside(other);
-				if (!added_to_open || temp_g_score < g_score[ohash]) {
+				var temp_g_score = g_score[bhash] + cost;
+				var visited = !!visited_set[ohash];
+				if (!visited || temp_g_score < g_score[ohash]) {
 					came_from[ohash] = best;
 					g_score[ohash] = temp_g_score;
-					f_score[ohash] = g_score[ohash] + h_func(other);
-					if (!added_to_open) {
-						
+					f_score[ohash] = g_score[ohash] + h_func(grid_cell);
+					if (!visited) {
+						open_set.push(grid_cell);
+						visited_set[ohash] = true;
+					} else {
+						open_set.rescoreElement(grid_cell);
 					}
 				}
 			}
 		}
+		while (open_set.size() > 0) {
+			var best = open_set.pop();
+			var bhash = hash_cell(best);
+			if (bhash == tohash) {
+				var head = best;
+				var ret = [best];
+				var parent = came_from[bhash];
+				while (parent) {
+					ret.push(parent);
+					parent = came_from[hash_cell(parent)];
+				}
+				return ret;
+			}
+			closed_set[bhash] = true;
+			add_neighbors(best.neighbors(), 1);
+			add_neighbors(best.diag_neighbors(), 1.414);
+		}
+		return [];
 	},
 	occluded : function (from, to) {
 		var next_cell = utilities.bresenham_line(from, to);
@@ -574,16 +710,25 @@ var mapg = {
 				this.passable = true;
 				this.neighboring_rooms = [];
 			},
-			equals: function(object) {
-				return other.x == x && other.y == y;
+			equals: function(other) {
+				return other.x == this.x && other.y == this.y;
 			},
-			neighbors_with: function (func) {
+			diag_neighbors: function () {
+				var celllb = new Cell(this.x-1, this.y+1);
+				var cellrb = new Cell(this.x+1, this.y+1);
+				var celllt = new Cell(this.x-1, this.y-1);
+				var cellrt = new Cell(this.x+1, this.y-1);
+				return [celllb,cellrb,celllt,cellrt];
+			},
+			neighbors: function () {
 				var celll = new Cell(this.x-1, this.y);
 				var cellr = new Cell(this.x+1, this.y);
 				var cellt = new Cell(this.x, this.y+1);
 				var cellb = new Cell(this.x, this.y-1);
-				var neighbors = [celll,cellr,cellt,cellb];
-				return _.filter(neighbors, func);
+				return [celll,cellr,cellt,cellb];
+			},
+			neighbors_with: function (func) {
+				return _.filter(this.neighbors(), func);
 			}
 		});
 		var hash_room = function (room) {
@@ -790,13 +935,16 @@ var draw_functions = {
 					width - line_width * 2, height - line_width * 2);
 		}
 	},
-	draw_character : function(ctx, character) {
-		var x1 = globals.centroid.x + Math.cos(character.facing) * 5;
-		var y1 = globals.centroid.y + Math.sin(character.facing) * 5;
-		var x2 = globals.centroid.x + Math.cos(character.facing + 2.35619449) * 5;
-		var y2 = globals.centroid.y + Math.sin(character.facing + 2.35619449) * 5;
-		var x3 = globals.centroid.x + Math.cos(character.facing - 2.35619449) * 5;
-		var y3 = globals.centroid.y + Math.sin(character.facing - 2.35619449) * 5;
+	draw_character : function(ctx, character, size, color) {
+		var ox = globals.centroid.x - globals.character.origin.x + character.origin.x;
+		var oy = globals.centroid.y - globals.character.origin.y + character.origin.y;
+		size = size || 5;
+		var x1 = ox + Math.cos(character.facing) * size;
+		var y1 = oy + Math.sin(character.facing) * size;
+		var x2 = ox + Math.cos(character.facing + 2.35619449) * size;
+		var y2 = oy + Math.sin(character.facing + 2.35619449) * size;
+		var x3 = ox + Math.cos(character.facing - 2.35619449) * size;
+		var y3 = oy + Math.sin(character.facing - 2.35619449) * size;
 		ctx.strokeStyle = "#000000";
 		ctx.beginPath();
 		ctx.moveTo(x1,y1);
@@ -804,6 +952,10 @@ var draw_functions = {
 		ctx.lineTo(x3,y3);
 		ctx.lineTo(x1,y1);
 		ctx.stroke();
+		if (color) {
+			ctx.fillStyle = color;
+			ctx.fill();
+		}
 	},
 	draw_tooltip : function(ctx, start, offset, room) {
 		var maxW = 0;
