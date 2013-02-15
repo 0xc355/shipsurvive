@@ -178,6 +178,15 @@ var core = {
 		view_bounds.end.x += 1;
 		view_bounds.end.y += 1;
 
+		var angle = Math.atan2(1,0);
+
+		var angular_distance = function(a, b) {
+			var raw = Math.abs(b - a);
+			while (raw > Math.PI * 2) {
+				raw -= Math.PI * 2;
+			}
+			return Math.PI - Math.abs(raw - Math.PI);
+		}
 		for (var y = view_bounds.origin.y; y < view_bounds.end.y; y++) {
 			for (var x = view_bounds.origin.x; x < view_bounds.end.x; x++) {
 				var cell = globals.map_grid[mapg.indexof(x,y)];
@@ -191,7 +200,16 @@ var core = {
 					wall_cells.push(cell);
 				}
 				var o_cell = {x:x,y:y};
-				if (mapg.occluded(globals.current_cell, o_cell)) {
+				var angle = Math.atan2(y - globals.current_cell.y, x - globals.current_cell.x);
+				var a_dist = angular_distance(globals.character.facing, angle);
+				if (y - globals.current_cell.y == 1 && x == globals.current_cell.x) {
+					angular_distance(globals.character.facing, angle);
+					console.log(a_dist);
+				}
+				
+				if (cell != globals.current_cell
+				    && (a_dist > Math.PI/3
+					|| mapg.occluded(globals.current_cell, o_cell))) {
 					occluded_cells.push(o_cell);
 				}
 			}
@@ -685,7 +703,6 @@ var draw_functions = {
 		if (line_width == undefined) {
 			line_width =  2;
 		}
-		console.log(line_width);
 		ctx.fillStyle = color;
 		for (var i = 0; i < cells.length; i++) {
 			var cell = cells[i];
