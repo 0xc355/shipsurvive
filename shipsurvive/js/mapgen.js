@@ -62,7 +62,7 @@ var core = {
 		core.Hostile = new JS.Class(core.Actor, {
 			initialize : function () {
 				this.callSuper();
-				this.speed = 70;
+				this.reset_speed();
 			},
 			corner_blocked : function (from, to) {
 				var dx = Math.min(Math.max(to.x - from.x,-1), 1);
@@ -88,6 +88,9 @@ var core = {
 					this.paused = true;
 				}
 			},
+			reset_speed : function () {
+				this.speed = utilities.random_interval(20,60);
+			},
 			update_function : function (dt) {
 				var angle_to;
 				if (this.paused || !this.cell) { return; }
@@ -110,6 +113,7 @@ var core = {
 					this.random_room();
 					while (this.cell.room == globals.character.cell.room) {
 						this.random_room();
+						this.reset_speed();
 					}
 					this.path = [];
 					this.next_cell = undefined;
@@ -136,9 +140,13 @@ var core = {
 		globals.mousePos = {"x":0, "y":0};
 		globals.room_types = {};
 		globals.objs = [];
+		if (globals.score) {
+			$("#score_display").text("Score: " + Math.round(globals.score));
+		}
+		globals.score = 0;
 		core.generate_map();
 		var hostile;
-		for (var i = 0; i < 10; i++) {
+		for (var i = 0; i < 5; i++) {
 			hostile = core.add_object("hostile");
 			hostile.random_room();
 		}
@@ -172,8 +180,10 @@ var core = {
 		};
 		globals.keys = {"w":false, "a":false, "s":false, "d":false};
 		globals.room_size = 50;
-		$("#size_slider").slider({max:200, min:10, step:1, value:50, slide:core.change_size});
+		globals.light_cone = 200;
+		$("#size_slider").slider({max:360, min:0, step:1, value:globals.light_cone, slide:core.change_size});
 		$("#noise_slider").slider({max:40, min:10, step:2, value:20, slide:core.change_noise});
+		$("p#size_display").text("Light Size: " + globals.light_cone);
 
 		var ratio = core.hiDPIRatio();
 		if (ratio != 1) {
@@ -235,8 +245,8 @@ var core = {
 		return new_obj;
 	},
 	change_size: function(event, ui) {
-		globals.room_size = Math.round(ui.value);
-		$("p#size_display").text("Size: " + globals.room_size);
+		globals.light_cone = Math.round(ui.value);
+		$("p#size_display").text("Light Size: " + globals.light_cone);
 	},
 	change_noise: function(event, ui) {
 		defaults.grid_width = Math.round(ui.value);
@@ -309,6 +319,7 @@ var core = {
 		var closed_door_cells = [];
 		var wall_cells = [];
 		var occluded_cells = [];
+		var non_occluded_cells = [];
 		var screen_end = {
 			x:globals.screen_bounds.origin.x + globals.screen_bounds.size.width,
 			y:globals.screen_bounds.origin.y + globals.screen_bounds.size.height
@@ -320,6 +331,7 @@ var core = {
 		view_bounds.end.y += 1;
 
 		var angle = Math.atan2(1,0);
+		var light_max_dist = (globals.light_cone / 360) * Math.PI;
 		for (var y = view_bounds.origin.y; y < view_bounds.end.y; y++) {
 			for (var x = view_bounds.origin.x; x < view_bounds.end.x; x++) {
 				var cell = globals.map_grid[mapg.indexof(x,y)];
@@ -335,20 +347,23 @@ var core = {
 				var o_cell = {x:x,y:y};
 				var angle = Math.atan2(y - globals.current_cell.y, x - globals.current_cell.x);
 				var a_dist = utilities.angular_distance(globals.character.facing, angle);
-				if (y - globals.current_cell.y == 1 && x == globals.current_cell.x) {
-					utilities.angular_distance(globals.character.facing, angle);
+				if (cell == globals.current_cell){
+					o_cell.opacity = 0;
+				} else if (light_max_dist != 0) {
+					o_cell.opacity = Math.pow(a_dist / light_max_dist, 3);
+				} else {
+					o_cell.opacity = 1;
 				}
-				
 				if (cell != globals.current_cell
-				    && (a_dist > Math.PI/3
+				    && (a_dist >= light_max_dist
 					|| mapg.occluded(globals.current_cell, o_cell))) {
 					var grid_ocell = globals.map_grid[mapg.indexof(o_cell)];
 					if(grid_ocell) {grid_ocell.occluded = true;}
 					occluded_cells.push(o_cell);
 				} else {
 					var grid_ocell = globals.map_grid[mapg.indexof(o_cell)];
-					if(grid_ocell) {grid_ocell.occluded = true;}
-					globals.map_grid[mapg.indexof(o_cell)].occluded = false;
+					if(grid_ocell) {grid_ocell.occluded = false;}
+					non_occluded_cells.push(o_cell);
 				}
 			}
 		}
@@ -363,16 +378,19 @@ var core = {
 				draw_functions.draw_character(globals.context, obj, 10, "#FF0000");
 		}
 		draw_functions.draw_cells(globals.context, occluded_cells,
-					  defaults.grid_width, "rgba(0,0,0,.5)", 0);
+					  defaults.grid_width, "rgba(0,0,0,1)", -1);
+		draw_functions.draw_cells(globals.context, non_occluded_cells,
+					  defaults.grid_width, "rgba(0,0,0,1)", -1, function (cell) {return cell.opacity});
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
-		draw_functions.draw_border(globals.context, 2);
+		draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-20}, globals.score);
 		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/100,
 					      {x:globals.screen_bounds.size.width - 20, y:30});
 		draw_functions.draw_healthbar(globals.context, "#00AA00", globals.character.hunger/globals.character.max_hunger,
 					      {x:globals.screen_bounds.size.width - 35, y:30});
 		draw_functions.draw_overlay(globals.context, "rgba(255,0,0," +globals.red_overlay_alpha + ")");
+		draw_functions.draw_border(globals.context, 2);
 	},
 	hiDPIRatio: function() {
 		var devicePixelRatio, backingStoreRatio;
@@ -394,6 +412,7 @@ var core = {
 		}
 	},
 	update : function(dt) {
+		globals.score += dt * 10;
 		var new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
 		var dd = {x:0, y:0};
 		var moved = false;
@@ -933,7 +952,7 @@ var mapg = {
 				room.food = 0;
 				globals.kitchens.push(room);
 			} else if (room.type == "cargo") {
-				room.food = 10;
+				room.food = 50;
 			}
 			globals.open_cells = open_set;
 			globals.map_grid = map_grid;
@@ -990,13 +1009,16 @@ var draw_functions = {
 			ctx.strokeRect(startX , startY, width, height);
 		}
 	},
-	draw_cells : function(ctx, cells, cell_width, color, line_width) {
+	draw_cells : function(ctx, cells, cell_width, color, line_width, op_func) {
 		if (line_width == undefined) {
 			line_width =  2;
 		}
 		ctx.fillStyle = color;
 		for (var i = 0; i < cells.length; i++) {
 			var cell = cells[i];
+			if (op_func) {
+				ctx.fillStyle = "rgba(0,0,0," + op_func(cell) + ")";
+			}
 			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
 			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
 			var width =  cell_width;
@@ -1026,6 +1048,10 @@ var draw_functions = {
 			ctx.fillStyle = color;
 			ctx.fill();
 		}
+	},
+	draw_score : function(ctx, offset, score) {
+		ctx.fillStyle = "#BB0000";
+		ctx.fillText("Score: " + Math.round(score), offset.x, offset.y);
 	},
 	draw_tooltip : function(ctx, start, offset, room) {
 		var maxW = 0;
