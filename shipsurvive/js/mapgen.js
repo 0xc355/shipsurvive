@@ -15,6 +15,68 @@ containers = {};
 /* core functions */
 var core = {
 	load_classes: function() {
+		core.Cell = new JS.Class({
+			initialize: function(x,y) {
+				this.x = x;
+				this.y = y;
+				this.type = "open";
+				this.passable = true;
+				this.powered = false;
+				this.power_source = false;
+				this.neighboring_rooms = [];
+			},
+			hash_cell: function() {
+				return this.x + this.y * globals.bounds.width;
+			},
+			equals: function(other) {
+				return other.x == this.x && other.y == this.y;
+			},
+			diag_neighbors: function () {
+				var celllb = new core.Cell(this.x-1, this.y+1);
+				var cellrb = new core.Cell(this.x+1, this.y+1);
+				var celllt = new core.Cell(this.x-1, this.y-1);
+				var cellrt = new core.Cell(this.x+1, this.y-1);
+				return [celllb,cellrb,celllt,cellrt];
+			},
+			left: function () {
+				return new core.Cell(this.x-1, this.y);
+			},
+			right: function () {
+				return new core.Cell(this.x+1, this.y);
+			},
+			bottom: function () {
+				return new core.Cell(this.x, this.y-1);
+			},
+			top: function () {
+				return new core.Cell(this.x, this.y+1);
+			},
+			gcell: function () {
+				return globals.map_grid[mapg.indexof(this)];
+			},
+			connectivity: function (ffilter) {
+				var ret = [];
+				if (ffilter(this.top().gcell())) {ret.top = true;}
+				if (ffilter(this.bottom().gcell())) {ret.bottom = true;}
+				if (ffilter(this.left().gcell())) {ret.left = true;}
+				if (ffilter(this.right().gcell())) {ret.right = true;}
+				return ret;
+			},
+			neighbors: function () {
+				var celll = new core.Cell(this.x-1, this.y);
+				var cellr = new core.Cell(this.x+1, this.y);
+				var cellt = new core.Cell(this.x, this.y+1);
+				var cellb = new core.Cell(this.x, this.y-1);
+				return [celll,cellr,cellt,cellb];
+			},
+			neighbors_with: function (func) {
+				return _.filter(this.neighbors(), func);
+			},
+			set_room: function(room) {
+				this.type = "room";
+				this.room = room;
+				this.name = room.type;
+			}
+		});
 		core.Actor = new JS.Class({
 			initialize: function(type, x, y) {
 				this.origin = {x:x, y:y};
@@ -67,8 +129,6 @@ var core = {
 			corner_blocked : function (from, to) {
 				var dx = Math.min(Math.max(to.x - from.x,-1), 1);
 				var dy = Math.min(Math.max(to.y - from.y, -1), 1);
-				//console.log(from, to);
-				//console.log(dx,dy);
 				if (Math.abs(dx) == 1 &&
 				    Math.abs(dy) == 1) {
 					//corner movement, check to make sure not blocked.
@@ -81,9 +141,13 @@ var core = {
 				}
 				return undefined;
 			},
+			recalc_room : function () {
+				var room_path = mapg.room_a_star(this.cell.room, globals.character.cell.room);
+				this.paused = room_path.length > 2;//if larger than 2 rooms, stop
+			},
 			recalc_path : function () {
+				this.path = mapg.grid_a_star(this.cell, globals.character.cell);
 				this.next_cell = undefined;
-				this.path = mapg.a_star(this.cell, globals.character.cell);
 				if (this.path.length == 0) {
 					this.paused = true;
 				}
@@ -181,6 +245,8 @@ var core = {
 		globals.keys = {"w":false, "a":false, "s":false, "d":false};
 		globals.room_size = 50;
 		globals.light_cone = 200;
+		globals.wires = [];
+		globals.powered_rooms = {mini_reactor:100, large_reactor:500};
 		$("#size_slider").slider({max:360, min:0, step:1, value:globals.light_cone, slide:core.change_size});
 		$("#noise_slider").slider({max:40, min:10, step:2, value:20, slide:core.change_noise});
 		$("p#size_display").text("Light Size: " + globals.light_cone);
@@ -198,6 +264,7 @@ var core = {
 		}
 		globals.context.font = defaults.font;
 		cv.addEventListener('click', core.toggle_door, true);
+		cv.addEventListener('contextmenu', core.toggle_wire, true);
 		cv.addEventListener('keydown', core.keydown_handler, true);
 		cv.addEventListener('keyup', core.keyup_handler, true);
 		cv.setAttribute('tabindex','0');
@@ -270,6 +337,20 @@ var core = {
 					globals.bounds.width, globals.bounds.height);
 		while(globals.place_next_room()) {}
 	},
+	toggle_wire: function () {
+		var grid_point = core.screen_to_grid_index(globals.mousePos);
+		var next_cell = core.check_position(grid_point.x, grid_point.y);
+		if (next_cell && next_cell.type != "door") {
+			if (next_cell.wired) {
+				next_cell.wired = false;
+				delete globals.wires[next_cell.hash_cell()];
+			} else {
+				next_cell.wired =  true;
+				globals.wires[next_cell.hash_cell()] = next_cell;
+			}
+		}
+		mapg.recalculate_power();
+	},
 	toggle_door: function () {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
@@ -297,7 +378,12 @@ var core = {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
 		console.log(grid_point.x, grid_point.y);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
-		console.log(next_cell);
+		var angle = Math.atan2(grid_point.y - globals.current_cell.y,
+				       grid_point.x - globals.current_cell.x);
+		var a_dist = utilities.angular_distance(globals.character.facing, angle);
+		globals.next_mouse_cell = next_cell;
+		if(next_cell)
+			console.log(a_dist, next_cell.opacity);
 	},
 	screen_to_grid_index: function(point) {
 		var new_origin = {}
@@ -318,8 +404,9 @@ var core = {
 		var open_door_cells = [];
 		var closed_door_cells = [];
 		var wall_cells = [];
-		var occluded_cells = [];
 		var non_occluded_cells = [];
+		var wires = [];
+
 		var screen_end = {
 			x:globals.screen_bounds.origin.x + globals.screen_bounds.size.width,
 			y:globals.screen_bounds.origin.y + globals.screen_bounds.size.height
@@ -335,50 +422,66 @@ var core = {
 		for (var y = view_bounds.origin.y; y < view_bounds.end.y; y++) {
 			for (var x = view_bounds.origin.x; x < view_bounds.end.x; x++) {
 				var cell = globals.map_grid[mapg.indexof(x,y)];
-				if (cell && cell.type == "door") {
+				if (!cell) {continue;}
+				if (cell.type == "door") {
 					if (cell.passable) {
 						open_door_cells.push(cell);
 					} else {
 						closed_door_cells.push(cell);
 					}
-				} else if (cell && cell.type == "wall") {
+				} else if (cell.type == "wall") {
 					wall_cells.push(cell);
 				}
+
+				if (cell.wired) {
+					wires.push(cell);
+				}
+
 				var o_cell = {x:x,y:y};
 				var angle = Math.atan2(y - globals.current_cell.y, x - globals.current_cell.x);
 				var a_dist = utilities.angular_distance(globals.character.facing, angle);
-				if (cell == globals.current_cell){
-					o_cell.opacity = 0;
+				var powered_multiplier = cell.room && cell.room.powered ? 1. : .5; 
+				var occluded = mapg.occluded(globals.current_cell, o_cell);
+				var m_dist = mapg.m_dist(globals.current_cell, o_cell);
+
+				var angle_opacity, distance_opacity, powered_opacity, occluded_opacity;
+				if (cell == globals.current_cell) {
+					angle_opacity = 0;
 				} else if (light_max_dist != 0) {
-					o_cell.opacity = Math.pow(a_dist / light_max_dist, 3);
+					angle_opacity = Math.pow(a_dist / (light_max_dist * powered_multiplier), 4);
 				} else {
-					o_cell.opacity = 1;
+					angle_opacity = 1;
 				}
-				if (cell != globals.current_cell
-				    && (a_dist >= light_max_dist
-					|| mapg.occluded(globals.current_cell, o_cell))) {
-					var grid_ocell = globals.map_grid[mapg.indexof(o_cell)];
-					if(grid_ocell) {grid_ocell.occluded = true;}
-					occluded_cells.push(o_cell);
+
+				distance_opacity = Math.min(1, m_dist / 2);
+				var powered;
+				if (cell.room) {
+					powered = cell.room && cell.room.powered;
 				} else {
-					var grid_ocell = globals.map_grid[mapg.indexof(o_cell)];
-					if(grid_ocell) {grid_ocell.occluded = false;}
-					non_occluded_cells.push(o_cell);
+					powered = cell.neighbors_with(function (n) {
+						var g = globals.map_grid[mapg.indexof(n)];
+						return g && g.room && g.room.powered;}).length > 0;
 				}
+				powered_opacity = powered ? .5 : 1;
+				occluded_opacity = occluded ? 1 : 0;
+				o_cell.opacity = Math.min(Math.max(Math.min(angle_opacity, powered_opacity),
+								occluded_opacity),
+								distance_opacity);
+				if(cell) {cell.occluded = !m_dist > 2 && occluded;}
+				non_occluded_cells.push(o_cell);
 			}
 		}
 		draw_functions.draw_cells(globals.context, wall_cells,
 					  defaults.grid_width, "rgba(60,60,60,1)");
 		draw_functions.draw_cells(globals.context, closed_door_cells, defaults.grid_width, "rgba(180,0,0,1)");
 		draw_functions.draw_cells(globals.context, open_door_cells, defaults.grid_width, "rgba(0,200,0,1)");
+		draw_functions.draw_wires(globals.context, wires, defaults.grid_width, "rgba(255,100,100,1)");
 		draw_functions.draw_character(globals.context, globals.character);
 		for (var i = 0; i < globals.objs.length; i++) {
 			var obj = globals.objs[i];
 			if (!obj.cell.occluded)
 				draw_functions.draw_character(globals.context, obj, 10, "#FF0000");
 		}
-		draw_functions.draw_cells(globals.context, occluded_cells,
-					  defaults.grid_width, "rgba(0,0,0,1)", -1);
 		draw_functions.draw_cells(globals.context, non_occluded_cells,
 					  defaults.grid_width, "rgba(0,0,0,1)", -1, function (cell) {return cell.opacity});
 		if (globals.current_cell) {
@@ -470,7 +573,25 @@ var core = {
 		return undefined;
 	}
 }
+
 var utilities = {
+	dfs : function(root, adjacent) {
+		var results = new JS.Set([root]);
+		var node_stack = adjacent(root);
+		console.log("node_stack", node_stack);
+		while (node_stack.length > 0) {
+			var next = node_stack.pop();
+			results.add(next);
+			var adjacent_nodes = adjacent(next);
+			for (var i = 0; i < adjacent_nodes.length; i++) {
+				var neighbor = adjacent_nodes[i];
+				if (!results.contains(neighbor)) {
+					node_stack.push(neighbor);
+				}
+			}
+		}
+		return results.entries();
+	},
 	angular_distance : function(a, b) {
 		var raw = Math.abs(b - a);
 		while (raw > Math.PI * 2) {
@@ -550,38 +671,86 @@ var utilities = {
 }
 
 var mapg = {
-	a_star: function (from, to) {
+	m_dist: function(from, to) {
+		if (from.x) {
+			return Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
+		} else {
+			return Math.abs(to.origin.x - from.origin.x)
+				+ Math.abs(to.origin.y - from.origin.y);
+		}
+	},
+	room_a_star: function(from, to) {
+		var hash_room = function(room) {
+			return room.origin.x + room.origin.y * globals.bounds.width;
+		};
+		var n_func = function(room) {
+			var neighbors = [];
+			var costs = [];
+			var adjacents = room.neighbors;
+			for (var i = 0; i < adjacents.length; i++) {
+				var other = adjacents[i].room;
+				var door = adjacents[i].door;
+				if (door.passable) {
+					neighbors.push(other);
+					costs.push(m_dist(room, other));
+				}
+			}
+			return {nodes:neighbors, costs:costs};
+		}
+		return mapg.a_star(from, to, hash_room, m_dist, n_func);
+	},
+	grid_a_star: function(from, to) {
 		var hash_cell = function(cell) {
 			return cell.x + cell.y * globals.bounds.width;
 		};
-		var h_func = function(cell) {
-			return Math.abs(to.x - cell.x) + Math.abs(to.y - cell.y);
-		};
+		var n_func = function(cell) {
+			var neighbors = [];
+			var costs = [];
+			var adjacents = cell.neighbors();
+			var diags = cell.neighbors();
+			for (var i = 0; i < adjacents.length; i++) {
+				var other = globals.map_grid[mapg.indexof(adjacents[i])];
+				if (other && other.passable) {
+					neighbors.push(other);
+					costs.push(1);
+				}
+			}
+			for (var i = 0; i < diags.length; i++) {
+				var other = globals.map_grid[mapg.indexof(diags[i])];
+				if (other && other.passable) {
+					neighbors.push(other);
+					costs.push(1.414);
+				}
+			}
+			return {nodes:neighbors, costs:costs};
+		}
 		
+		return mapg.a_star(from, to, hash_cell, mapg.m_dist, n_func);
+	},
+	a_star: function (from, to, hash_func, h_func, n_func) {
 		var closed_set = [];
 		var open_set = new BinaryHeap(function(cell) {
-			var chash = hash_cell(cell);
+			var chash = hash_func(cell);
 			return f_score[chash];
 		});
-		var tohash = hash_cell(to);
+		var tohash = hash_func(to);
 		open_set.push(from);
 		var came_from = {};
 		var visited_set = [];
-		visited_set[hash_cell(from)] = true;
+		visited_set[hash_func(from)] = true;
 
 		var g_score = {};
 		var f_score = {};
-		g_score[hash_cell(from)] = 0;
-		f_score[hash_cell(from)] = h_func(from);
+		g_score[hash_func(from)] = 0;
+		f_score[hash_func(from)] = h_func(from, to);
 
-		var add_neighbors = function(neighbors, cost) {
-			for (var i = 0; i < neighbors.length; i++) {
-				var other = neighbors[i];
-				var grid_cell = globals.map_grid[mapg.indexof(other)];
-				if (!grid_cell || !grid_cell.passable) {
-					continue;
-				}
-				var ohash = hash_cell(grid_cell);
+		var add_neighbors = function(neighbors) {
+			var nodes = neighbors.nodes;
+			var costs = neighbors.costs;
+			for (var i = 0; i < nodes.length; i++) {
+				var other = nodes[i];
+				var cost = costs[i];
+				var ohash = hash_func(other);
 				if (closed_set[ohash]) {
 					continue;
 				}
@@ -590,32 +759,32 @@ var mapg = {
 				if (!visited || temp_g_score < g_score[ohash]) {
 					came_from[ohash] = best;
 					g_score[ohash] = temp_g_score;
-					f_score[ohash] = g_score[ohash] + h_func(grid_cell);
+					f_score[ohash] = g_score[ohash] + h_func(other, to);
 					if (!visited) {
-						open_set.push(grid_cell);
+						open_set.push(other);
 						visited_set[ohash] = true;
 					} else {
-						open_set.rescoreElement(grid_cell);
+						open_set.rescoreElement(other);
 					}
 				}
 			}
 		}
 		while (open_set.size() > 0) {
 			var best = open_set.pop();
-			var bhash = hash_cell(best);
+			var bhash = hash_func(best);
 			if (bhash == tohash) {
 				var head = best;
 				var ret = [best];
 				var parent = came_from[bhash];
 				while (parent) {
 					ret.push(parent);
-					parent = came_from[hash_cell(parent)];
+					parent = came_from[hash_func(parent)];
 				}
 				return ret;
 			}
 			closed_set[bhash] = true;
-			add_neighbors(best.neighbors(), 1);
-			add_neighbors(best.diag_neighbors(), 1.414);
+			var neighbors = n_func(best);
+			add_neighbors(neighbors);
 		}
 		return [];
 	},
@@ -644,7 +813,69 @@ var mapg = {
 			return x.y * globals.bounds.width + x.x;
 		}
 	},
-	generate_room_graph: function(min_rooms, width, height) {
+	collect_wiresets : function () {
+		var wires = [];
+		var keys = _.map(_.values(globals.wires), function (n) {return n.hash_cell()});
+		var working_keys = keys;
+		var wiresets = [];
+		while (working_keys.length > 0) {
+			var current_key = working_keys[0];
+			var current_wire = globals.wires[current_key];
+			var connected_wires = utilities.dfs(current_key, function (node) {
+				var ret = [];
+				var neighbors = globals.wires[node].neighbors_with(
+					function (n) {
+					var g = globals.map_grid[mapg.indexof(n)];
+					return g && g.wired;});
+				neighbors.forEach(function (n) {ret.push(n.hash_cell())});
+				return ret;
+			});
+			var new_set = [];
+			for (var i = 0; i < connected_wires.length; i++) {
+				new_set.push(globals.wires[connected_wires[i]]);
+			}
+			wiresets.push(new_set);
+			console.log(working_keys, connected_wires);
+			working_keys = _.difference(working_keys, connected_wires);
+			console.log("next_iter:", working_keys);
+		}
+		for (var i = 0; i < wiresets.length; i++) {
+			for (var j = 0; j < wiresets[i].length; j++) {
+				delete wiresets[i][j].color;;
+			}
+		}
+		return wiresets;
+	},
+	recalculate_power : function() {
+		var wiresets = mapg.collect_wiresets();
+		globals.rooms.forEach(function (room) {room.powered = false;});
+		wiresets.forEach(function (wireset) {
+			var room_set = new JS.Set();
+			for (var i = 0; i < wireset.length; i++) {
+				var wire = wireset[i];
+				if (wire.room) {room_set.add(wire.room)};
+			}
+			var power_available = 0;
+			var power_drain = 0;
+			room_set.entries().forEach(function (room) {
+				if (room.power_src > 0) {
+					power_available += room.power_src;
+				} else {
+					power_drain += room.dimensions.width
+							* room.dimensions.height;
+				}
+			});
+			var enough_power = power_drain < power_available;
+			room_set.entries().forEach(function (room) {
+				if (room.power_src <= 0) {
+					room.powered |= enough_power;
+				} else {
+					room.powered = true;
+				}
+			});
+		});
+	},
+	generate_room_graph : function(min_rooms, width, height) {
 		var rooms = [];
 		var types_added = {};
 		var tWeight = 0;
@@ -760,50 +991,16 @@ var mapg = {
 					var cell = map_grid[index];
 					if (cell) {
 						cells_displaced.add(cell);
-						cell.type = "room";
-						cell.room = room;
-						cell.name = room.type;
 					} else {
-						cell = new Cell(x,y);
-						cell.type = "room";
-						cell.name = room.type;
-						cell.room = room;
+						cell = new core.Cell(x,y);
 						map_grid[mapg.indexof(x,y)] = cell;
 					}
+					cell.set_room(room);
 				}
 			}
 			return cells_displaced;
 		}
 		
-		var Cell = new JS.Class({
-			initialize: function(x,y) {
-				this.x = x;
-				this.y = y;
-				this.type = "open";
-				this.passable = true;
-				this.neighboring_rooms = [];
-			},
-			equals: function(other) {
-				return other.x == this.x && other.y == this.y;
-			},
-			diag_neighbors: function () {
-				var celllb = new Cell(this.x-1, this.y+1);
-				var cellrb = new Cell(this.x+1, this.y+1);
-				var celllt = new Cell(this.x-1, this.y-1);
-				var cellrt = new Cell(this.x+1, this.y-1);
-				return [celllb,cellrb,celllt,cellrt];
-			},
-			neighbors: function () {
-				var celll = new Cell(this.x-1, this.y);
-				var cellr = new Cell(this.x+1, this.y);
-				var cellt = new Cell(this.x, this.y+1);
-				var cellb = new Cell(this.x, this.y-1);
-				return [celll,cellr,cellt,cellb];
-			},
-			neighbors_with: function (func) {
-				return _.filter(this.neighbors(), func);
-			}
-		});
 		var hash_room = function (room) {
 			return room.origin.x + ", " + room.origin.y;
 		}
@@ -813,14 +1010,14 @@ var mapg = {
 				return;
 			} 
 			for (var y = room.origin.y - 1; y < room.origin.y + room.dimensions.height + 1; y++) {
-				var new_cell = new Cell(room.origin.x - 1, y);
-				var new_cell2 = new Cell(room.origin.x + room.dimensions.width, y);
+				var new_cell = new core.Cell(room.origin.x - 1, y);
+				var new_cell2 = new core.Cell(room.origin.x + room.dimensions.width, y);
 				new_cells.push(new_cell);
 				new_cells.push(new_cell2);
 			}
 			for (var x = room.origin.x; x < room.origin.x + room.dimensions.width; x++) {
-				var new_cell = new Cell(x, room.origin.y - 1);
-				var new_cell2 = new Cell(x, room.origin.y + room.dimensions.height);
+				var new_cell = new core.Cell(x, room.origin.y - 1);
+				var new_cell2 = new core.Cell(x, room.origin.y + room.dimensions.height);
 				new_cells.push(new_cell);
 				new_cells.push(new_cell2);
 			}
@@ -837,6 +1034,7 @@ var mapg = {
 				return room_neighbors.length > 1;
 			}
 			var connecting_rooms = new JS.Set();
+			var room_map = {};
 			var viable_doors = {};
 			var neighboring_rooms = new JS.Set();
 			for (var i = 0; i < new_cells.length; i++) {
@@ -853,8 +1051,10 @@ var mapg = {
 					} else if (grid_cell.type == "wall"
 						   && can_be_door(grid_cell, neighboring_rooms)) {
 						neighboring_rooms.remove(room);
-						var neighbor = hash_room(neighboring_rooms.entries()[0]);
+						var neighboring_room = neighboring_rooms.entries()[0];
+						var neighbor = hash_room(neighboring_room);
 						connecting_rooms.add(neighbor);
+						room_map[neighbor] = neighboring_room;
 						if (viable_doors[neighbor]) {
 							viable_doors[neighbor].push(grid_cell);
 						} else {
@@ -865,12 +1065,16 @@ var mapg = {
 			}
 			var connecting_rooms = connecting_rooms.entries();
 			for (var i = 0; i < connecting_rooms.length; i++) {
-				var doors = viable_doors[connecting_rooms[i]];
+				var room_hash = connecting_rooms[i];
+				var connecting_room = room_map[room_hash];
+				var doors = viable_doors[room_hash];
 				if (doors) {
 					var cell = doors[utilities.random_interval(0,doors.length)];
 					cell.type = "door";
 					cell.passable = utilities.random_interval(0,2) == 1;
 					wall_set.remove(cell);
+					room.connections.push({room:connecting_room, door:cell});
+					connecting_room.connections.push({room:room, door:cell});
 				}
 			}
 		}
@@ -880,14 +1084,14 @@ var mapg = {
 				return;
 			} 
 			for (var y = room.origin.y; y < room.origin.y + room.dimensions.height; y++) {
-				var new_cell = new Cell(room.origin.x - 2, y);
-				var new_cell2 = new Cell(room.origin.x + room.dimensions.width + 1, y);
+				var new_cell = new core.Cell(room.origin.x - 2, y);
+				var new_cell2 = new core.Cell(room.origin.x + room.dimensions.width + 1, y);
 				new_cells.push(new_cell);
 				new_cells.push(new_cell2);
 			}
 			for (var x = room.origin.x; x < room.origin.x + room.dimensions.width; x++) {
-				var new_cell = new Cell(x, room.origin.y - 2);
-				var new_cell2 = new Cell(x, room.origin.y + room.dimensions.height + 1);
+				var new_cell = new core.Cell(x, room.origin.y - 2);
+				var new_cell2 = new core.Cell(x, room.origin.y + room.dimensions.height + 1);
 				new_cells.push(new_cell);
 				new_cells.push(new_cell2);
 			}
@@ -933,6 +1137,14 @@ var mapg = {
 				room.origin = entries[open_index];
 			}
 			room.type = room.name;
+			room.connections = [];
+			if (globals.powered_rooms[room.type]) {
+				room.powered = true;
+				room.power_src = globals.powered_rooms[room.type];
+			} else {
+				room.powered = false;
+				room.power_src = 0;
+			}
 			var dead_cells = place_room(room, map_grid);
 			var tries = 0;
 			while (!dead_cells) {
@@ -995,10 +1207,10 @@ var draw_functions = {
 			ctx.strokeStyle = "#000000";
 			var index = globals.room_types[room.name].type_index;
 			var col = (index/globals.room_data.length)*2 - 1;
-			if (globals.current_cell && globals.current_cell.room != room) {
-				ctx.fillStyle = utilities.colormap_jet(col, .5);
-			} else {
+			if (room.powered) {
 				ctx.fillStyle = utilities.colormap_jet(col, 2.0);
+			} else {
+				ctx.fillStyle = "#404040";
 			}
 			var startX = room.origin.x * cell_width - globals.character.origin.x + globals.centroid.x;
 			var width = room.dimensions.width * cell_width;
@@ -1009,6 +1221,38 @@ var draw_functions = {
 			ctx.strokeRect(startX , startY, width, height);
 		}
 	},
+	draw_wires : function(ctx, cells, cell_width, color, line_width) {
+		if (line_width == undefined) {
+			line_width =  2;
+		}
+		for (var i = 0; i < cells.length; i++) {
+			var cell = cells[i];
+			ctx.fillStyle = cell.color;
+			var connectivity = cell.connectivity(function (cell) {return cell && cell.wired});
+			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
+			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
+			var width =  cell_width;
+			var height = cell_width;			
+			ctx.fillRect(startX + (width/2 - line_width), startY + (width/2 - line_width),
+					line_width * 2, line_width * 2);
+			if (connectivity.left) {
+				ctx.fillRect(startX-1, startY + (width/2 - line_width),
+						width/2 + 1, line_width * 2);
+			}
+			if (connectivity.right) {
+				ctx.fillRect(startX + width/2, startY + (width/2 - line_width),
+						width/2 + 1, line_width * 2);
+			}
+			if (connectivity.bottom) {
+				ctx.fillRect(startX + (width/2 - line_width), startY - 1,
+						line_width * 2, height/2 + 1);
+			}
+			if (connectivity.top) {
+				ctx.fillRect(startX + (width/2 - line_width), startY + height/2,
+						line_width * 2, height/2 + 1);
+			}
+		}
+	},
 	draw_cells : function(ctx, cells, cell_width, color, line_width, op_func) {
 		if (line_width == undefined) {
 			line_width =  2;
@@ -1017,7 +1261,9 @@ var draw_functions = {
 		for (var i = 0; i < cells.length; i++) {
 			var cell = cells[i];
 			if (op_func) {
-				ctx.fillStyle = "rgba(0,0,0," + op_func(cell) + ")";
+				var op = op_func(cell);
+				var rounded_op = Math.round(op * 256)/256;
+				ctx.fillStyle = "rgba(0,0,0," + rounded_op + ")";
 			}
 			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
 			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
