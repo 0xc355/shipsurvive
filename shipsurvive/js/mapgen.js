@@ -8,7 +8,7 @@ defaults = {
 	grid_width: 20,
 	room_min: 5,
 	room_max: 10,
-	font: '14px Arial',
+	font: 'Cutive Mono',
 },
 containers = {};
 
@@ -210,7 +210,7 @@ var core = {
 		globals.score = 0;
 		core.generate_map();
 		var hostile;
-		for (var i = 0; i < 5; i++) {
+		for (var i = 0; i < 2; i++) {
 			hostile = core.add_object("hostile");
 			hostile.random_room();
 		}
@@ -265,6 +265,8 @@ var core = {
 		globals.context.font = defaults.font;
 		cv.addEventListener('click', core.toggle_door, true);
 		cv.addEventListener('contextmenu', core.toggle_wire, true);
+		cv.addEventListener('mousedown', core.mouse_down, true);
+		cv.addEventListener('mouseup', core.mouse_up, true);
 		cv.addEventListener('keydown', core.keydown_handler, true);
 		cv.addEventListener('keyup', core.keyup_handler, true);
 		cv.setAttribute('tabindex','0');
@@ -285,6 +287,9 @@ var core = {
 			globals.character.facing = 
 				Math.atan2(globals.mousePos.y - globals.centroid.y,
 					 globals.mousePos.x - globals.centroid.x);
+			if (globals.keys.rmouse) {
+				core.toggle_wire();
+			}
 		}, false);
 		window.requestAnimFrame = (function(){
 			return  window.requestAnimationFrame       || 
@@ -320,17 +325,25 @@ var core = {
 		var val = Math.round(ui.value);
 		$("p#noise_display").text("Cell Length: " + val);
 	},
+	mouse_down: function (evt) {
+		if (evt.which == 3) {globals.keys.rmouse = true;}
+	},
+	mouse_up: function (evt) {
+		if (evt.which == 3) {globals.keys.rmouse = false;}
+	},
 	keydown_handler: function (evt) {
 		if (evt.keyCode == 87) {globals.keys["w"] = true;} 
 		if (evt.keyCode == 65) {globals.keys["a"] = true;}
 		if (evt.keyCode == 83) {globals.keys["s"] = true;}
 		if (evt.keyCode == 68) {globals.keys["d"] = true;}
+		if (evt.keyCode == 16) {globals.keys["shift"] = true;}
 	},
 	keyup_handler: function (evt) {
 		if (evt.keyCode == 87) {globals.keys["w"] = false;} 
 		if (evt.keyCode == 65) {globals.keys["a"] = false;}
 		if (evt.keyCode == 83) {globals.keys["s"] = false;}
 		if (evt.keyCode == 68) {globals.keys["d"] = false;}
+		if (evt.keyCode == 16) {globals.keys["shift"] = false;}
 	},
 	generate_map: function() {
 		globals.place_next_room = mapg.generate_room_graph(globals.room_size,
@@ -340,11 +353,14 @@ var core = {
 	toggle_wire: function () {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
-		if (next_cell && next_cell.type != "door") {
-			if (next_cell.wired) {
+		var dx = next_cell.x - globals.current_cell.x;
+		var dy = next_cell.y - globals.current_cell.y;
+		var distance = Math.sqrt(dx*dx + dy*dy);
+		if (next_cell && next_cell.passable && distance < 2.5) {
+			if (next_cell.wired && globals.keys.shift) {
 				next_cell.wired = false;
 				delete globals.wires[next_cell.hash_cell()];
-			} else {
+			} else if (!next_cell.wired &&  !globals.keys.shift){
 				next_cell.wired =  true;
 				globals.wires[next_cell.hash_cell()] = next_cell;
 			}
@@ -354,7 +370,9 @@ var core = {
 	toggle_door: function () {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
-		if (next_cell && next_cell.type == "door" && next_cell != globals.current_cell) {
+		if (next_cell && next_cell.type == "door"
+		    		&& next_cell != globals.current_cell
+	    			&& !next_cell.wired) {
 			var collided = false;
 			for (var i = 0; i < globals.objs.length; i++) {
 				var obj = globals.objs[i];
@@ -487,7 +505,7 @@ var core = {
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
-		draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-20}, globals.score);
+		draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-10}, globals.score);
 		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/100,
 					      {x:globals.screen_bounds.size.width - 20, y:30});
 		draw_functions.draw_healthbar(globals.context, "#00AA00", globals.character.hunger/globals.character.max_hunger,
@@ -522,7 +540,8 @@ var core = {
 		var original_cell = globals.character.cell;
 		for (var i = 0; i < globals.kitchens.length; i++) {
 			var kitchen = globals.kitchens[i];
-			kitchen.food = Math.min(40, kitchen.food + dt);
+			var food_rate = kitchen.powered ? 2 : .5;
+			kitchen.food = Math.min(40, kitchen.food + food_rate * dt);
 		}
 		if (globals.keys.w) { dd.y -= dt * 100; }
 		if (globals.keys.s) { dd.y += dt * 100; }
@@ -537,7 +556,8 @@ var core = {
 			var room = globals.character.cell.room;
 			var room_name = room.name;
 			if (room_name == "medical_bay") {
-				globals.character.health = Math.min(globals.character.health + 2 * dt, 100);
+				var heal_rate = room.powered ? 5 : 1;
+				globals.character.health = Math.min(globals.character.health + heal_rate * dt, 100);
 			}
 			if (room_name == "cargo" || room_name == "kitchen") {
 				if (room.food > 0) {
@@ -550,7 +570,7 @@ var core = {
 			}
 		}
 		if (globals.character.hunger > 0) {
-			globals.character.hunger -= dt * 3;
+			globals.character.hunger -= dt;
 		} else {
 			core.reset();
 		}
@@ -578,7 +598,6 @@ var utilities = {
 	dfs : function(root, adjacent) {
 		var results = new JS.Set([root]);
 		var node_stack = adjacent(root);
-		console.log("node_stack", node_stack);
 		while (node_stack.length > 0) {
 			var next = node_stack.pop();
 			results.add(next);
@@ -671,6 +690,13 @@ var utilities = {
 }
 
 var mapg = {
+	hash_room : function(room) {
+		if (room) {
+			return room.origin.x + ", " + room.origin.y;
+		} else {
+			return undefined;
+		}
+	},
 	m_dist: function(from, to) {
 		if (from.x) {
 			return Math.abs(to.x - from.x) + Math.abs(to.y - from.y);
@@ -818,6 +844,7 @@ var mapg = {
 		var keys = _.map(_.values(globals.wires), function (n) {return n.hash_cell()});
 		var working_keys = keys;
 		var wiresets = [];
+		var power_sources = {};
 		while (working_keys.length > 0) {
 			var current_key = working_keys[0];
 			var current_wire = globals.wires[current_key];
@@ -835,20 +862,22 @@ var mapg = {
 				new_set.push(globals.wires[connected_wires[i]]);
 			}
 			wiresets.push(new_set);
-			console.log(working_keys, connected_wires);
 			working_keys = _.difference(working_keys, connected_wires);
-			console.log("next_iter:", working_keys);
 		}
-		for (var i = 0; i < wiresets.length; i++) {
-			for (var j = 0; j < wiresets[i].length; j++) {
-				delete wiresets[i][j].color;;
-			}
-		}
+		wiresets.forEach(function (wireset) {
+			wireset.forEach(function (wire) {
+				if (power_sources[mapg.hash_room(wire.room)]) {
+					power_sources[mapg.hash_room(wire.room)].add(wireset);
+				} else {
+					power_sources[mapg.hash_room(wire.room)] = new JS.Set([wireset]);
+				}
+			});
+		});
 		return wiresets;
 	},
 	recalculate_power : function() {
 		var wiresets = mapg.collect_wiresets();
-		globals.rooms.forEach(function (room) {room.powered = false;});
+		globals.rooms.forEach(function (room) {room.powered = room.power_src > 0;});
 		wiresets.forEach(function (wireset) {
 			var room_set = new JS.Set();
 			for (var i = 0; i < wireset.length; i++) {
@@ -872,6 +901,9 @@ var mapg = {
 				} else {
 					room.powered = true;
 				}
+			});
+			wireset.forEach(function (wire) {
+				wire.powered = enough_power;
 			});
 		});
 	},
@@ -1002,7 +1034,11 @@ var mapg = {
 		}
 		
 		var hash_room = function (room) {
-			return room.origin.x + ", " + room.origin.y;
+			if (room) {
+				return room.origin.x + ", " + room.origin.y;
+			} else {
+				return undefined;
+			}
 		}
 		var add_walls = function (room, grid, wall_set) {
 			var new_cells = [];
@@ -1227,7 +1263,11 @@ var draw_functions = {
 		}
 		for (var i = 0; i < cells.length; i++) {
 			var cell = cells[i];
-			ctx.fillStyle = cell.color;
+			if (cell.powered) {
+				ctx.fillStyle = "#00FF00";
+			} else {
+				ctx.fillStyle = "#AA0000";
+			}
 			var connectivity = cell.connectivity(function (cell) {return cell && cell.wired});
 			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
 			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
@@ -1296,7 +1336,9 @@ var draw_functions = {
 		}
 	},
 	draw_score : function(ctx, offset, score) {
-		ctx.fillStyle = "#BB0000";
+		ctx.font = "bold 20px " + defaults.font;
+		ctx.textBaseline = "bottom";
+		ctx.fillStyle = "#DD0000";
 		ctx.fillText("Score: " + Math.round(score), offset.x, offset.y);
 	},
 	draw_tooltip : function(ctx, start, offset, room) {
@@ -1337,16 +1379,15 @@ var draw_functions = {
 		var startX = start.x + offset.x;
 		var startY = start.y + offset.y;
 		var name_str = text.replace("_"," ");
-		var lines = getLines(ctx, name_str, 200);
+		var lines = getLines(ctx, name_str, 95);
 		var lineHeight = 14;
 		var maxH = lines.length * lineHeight;
-		ctx.font = globals.font;
+		ctx.font = "14 px " + defaults.font;
 		ctx.fillStyle = "rgba(100,150,255,.7)";
 		ctx.fillRect(startX, startY, maxW + 20, maxH + 10);
 		ctx.fillStyle = "#000000";
 		ctx.textBaseline = "top";
 		
-		var lines = getLines(ctx, name_str, 95);
 		for (var i = 0; i < lines.length; i++) {
 			ctx.fillText(lines[i], startX + 5, startY + lineHeight * i);
 		}
