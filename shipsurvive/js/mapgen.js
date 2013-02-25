@@ -25,11 +25,11 @@ var core = {
 	},
 	load_images: function() {
 		core.load_image("g_food", "img/sprite/food.png");
-		core.load_image("g_health", "img/sprite/health.png");
+		core.load_image("g_medipack", "img/sprite/medipack.png");
 		core.load_image("g_wire", "img/sprite/wire.png");
 		core.load_image("g_wire_cutter", "img/sprite/wire_cutter.png");
 		core.load_image("food", "img/icon/food.png");
-		core.load_image("health", "img/icon/health.png");
+		core.load_image("medipack", "img/icon/medipack.png");
 		core.load_image("wire", "img/icon/wire.png");
 		core.load_image("wire_cutter", "img/icon/wire_cutter.png");
 	},
@@ -713,7 +713,7 @@ var items = {
 		globals.character.hunger = Math.min(globals.character.max_hunger, globals.character.hunger + amount);
 		return 1;
 	},
-	health: function(item) {
+	medipack: function(item) {
 		var amount = item.quality || 10;
 		globals.character.health = Math.min(globals.character.max_health, globals.character.health + amount);
 		return 1;
@@ -1357,12 +1357,6 @@ var mapg = {
 				}
 			}
 			add_walls(room, map_grid, globals.walls);
-			if (room.type == "kitchen") {
-				room.food = 0;
-				globals.kitchens.push(room);
-			} else if (room.type == "cargo") {
-				room.food = 50;
-			}
 			globals.open_cells = open_set;
 			globals.map_grid = map_grid;
 			globals.rooms = rooms;
