@@ -14,6 +14,25 @@ containers = {};
 
 /* core functions */
 var core = {
+	load_image: function(name, src) {
+		if (!globals.images[name]) {
+			var img = new Image();
+			img.src = src;
+			img.onload = function () {
+				globals.images[name] = img;
+			};
+		}
+	},
+	load_images: function() {
+		core.load_image("g_food", "img/sprite/food.png");
+		core.load_image("g_health", "img/sprite/health.png");
+		core.load_image("g_wire", "img/sprite/wire.png");
+		core.load_image("g_wire_cutter", "img/sprite/wire_cutter.png");
+		core.load_image("food", "img/icon/food.png");
+		core.load_image("health", "img/icon/health.png");
+		core.load_image("wire", "img/icon/wire.png");
+		core.load_image("wire_cutter", "img/icon/wire_cutter.png");
+	},
 	load_classes: function() {
 		core.Cell = new JS.Class({
 			initialize: function(x,y) {
@@ -122,11 +141,11 @@ var core = {
 			}
 		});
 		core.Hostile = new JS.Class(core.Actor, {
-			initialize : function () {
+			initialize: function () {
 				this.callSuper();
 				this.reset_speed();
 			},
-			corner_blocked : function (from, to) {
+			corner_blocked: function (from, to) {
 				var dx = Math.min(Math.max(to.x - from.x,-1), 1);
 				var dy = Math.min(Math.max(to.y - from.y, -1), 1);
 				if (Math.abs(dx) == 1 &&
@@ -141,21 +160,21 @@ var core = {
 				}
 				return undefined;
 			},
-			recalc_room : function () {
+			recalc_room: function () {
 				var room_path = mapg.room_a_star(this.cell.room, globals.character.cell.room);
 				this.paused = room_path.length > 2;//if larger than 2 rooms, stop
 			},
-			recalc_path : function () {
+			recalc_path: function () {
 				this.path = mapg.grid_a_star(this.cell, globals.character.cell);
 				this.next_cell = undefined;
 				if (this.path.length == 0) {
 					this.paused = true;
 				}
 			},
-			reset_speed : function () {
+			reset_speed: function () {
 				this.speed = utilities.random_interval(20,60);
 			},
-			update_function : function (dt) {
+			update_function: function (dt) {
 				var angle_to;
 				if (this.paused || !this.cell) { return; }
 				if (!this.next_cell || this.cell.equals(this.next_cell)) {
@@ -204,9 +223,20 @@ var core = {
 		globals.mousePos = {"x":0, "y":0};
 		globals.room_types = {};
 		globals.objs = [];
-		if (globals.score) {
-			$("#score_display").text("Score: " + Math.round(globals.score));
-		}
+		globals.item_map = [];
+		globals.inventory = [
+			{type:"wire_cutter", amount:1}
+		];
+		globals.inventory.add_item = function (type, amount) {
+			var item = _.find(this, function (item) {
+				return item.type == type;
+			});
+			if (item) {
+				item.amount += amount;
+			} else {
+				this.push({type:type, amount:amount});
+			}
+		};
 		globals.score = 0;
 		core.generate_map();
 		var hostile;
@@ -216,9 +246,21 @@ var core = {
 		}
 		globals.character = new core.Actor("player", 0, 0);
 		globals.character.random_room();
-		globals.character.health = 100;
+		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
-		globals.character.hunger = 100;
+		globals.character.health = globals.character.max_health;
+		globals.character.hunger = globals.character.max_hunger;
+		globals.room_func = [];
+		globals.rooms.forEach(function (room) {
+			if (rooms[room.type]) {
+				var room_f = rooms[room.type](room);
+				if (room_f) {
+					globals.room_func.push(room_f);
+				}
+			} else {
+				rooms.default_function(room);
+			}
+		});
 	},
 	init: function() {
 		core.load_classes();
@@ -231,6 +273,8 @@ var core = {
 		globals.context = cv.getContext('2d');
 		globals.context.background = defaults.background;
 		globals.params = {noise_size: 1, radius_size:9};
+		globals.images = {};
+		core.load_images();
 		globals.screen_bounds = {
 			origin: {x: 0, y: 0},
 			size: {
@@ -332,18 +376,32 @@ var core = {
 		if (evt.which == 3) {globals.keys.rmouse = false;}
 	},
 	keydown_handler: function (evt) {
-		if (evt.keyCode == 87) {globals.keys["w"] = true;} 
-		if (evt.keyCode == 65) {globals.keys["a"] = true;}
-		if (evt.keyCode == 83) {globals.keys["s"] = true;}
-		if (evt.keyCode == 68) {globals.keys["d"] = true;}
-		if (evt.keyCode == 16) {globals.keys["shift"] = true;}
+		var code = evt.keyCode;
+		if (code == 87) {globals.keys["w"] = true;} 
+		if (code == 65) {globals.keys["a"] = true;}
+		if (code == 83) {globals.keys["s"] = true;}
+		if (code == 68) {globals.keys["d"] = true;}
+		if (code == 16) {globals.keys["shift"] = true;}
+		if (code >= 48 && code <= 57) {
+			//code is 0-9
+			var num = (code - 48 + 9) % 10;
+			var item = globals.inventory[num];
+			if (item && item.amount > 0) {
+				var used = items[item.type](item);
+				item.amount = Math.max(0, item.amount - used);
+			}
+			if (item.amount == 0) {
+				globals.inventory.splice(num, 1);
+			}
+		}
 	},
 	keyup_handler: function (evt) {
-		if (evt.keyCode == 87) {globals.keys["w"] = false;} 
-		if (evt.keyCode == 65) {globals.keys["a"] = false;}
-		if (evt.keyCode == 83) {globals.keys["s"] = false;}
-		if (evt.keyCode == 68) {globals.keys["d"] = false;}
-		if (evt.keyCode == 16) {globals.keys["shift"] = false;}
+		var code = evt.keyCode;
+		if (code == 87) {globals.keys["w"] = false;} 
+		if (code == 65) {globals.keys["a"] = false;}
+		if (code == 83) {globals.keys["s"] = false;}
+		if (code == 68) {globals.keys["d"] = false;}
+		if (code == 16) {globals.keys["shift"] = false;}
 	},
 	generate_map: function() {
 		globals.place_next_room = mapg.generate_room_graph(globals.room_size,
@@ -423,6 +481,7 @@ var core = {
 		var closed_door_cells = [];
 		var wall_cells = [];
 		var non_occluded_cells = [];
+		var items = [];
 		var wires = [];
 
 		var screen_end = {
@@ -454,11 +513,14 @@ var core = {
 				if (cell.wired) {
 					wires.push(cell);
 				}
-
 				var o_cell = {x:x,y:y};
+				var item = globals.item_map[mapg.indexof(x,y)];
+				if (item) {
+					items.push({position:cell, item:item});
+				}
 				var angle = Math.atan2(y - globals.current_cell.y, x - globals.current_cell.x);
 				var a_dist = utilities.angular_distance(globals.character.facing, angle);
-				var powered_multiplier = cell.room && cell.room.powered ? 1. : .5; 
+				var powered_multiplier = cell.room && cell.room.powered ? 1.: .5; 
 				var occluded = mapg.occluded(globals.current_cell, o_cell);
 				var m_dist = mapg.m_dist(globals.current_cell, o_cell);
 
@@ -480,8 +542,8 @@ var core = {
 						var g = globals.map_grid[mapg.indexof(n)];
 						return g && g.room && g.room.powered;}).length > 0;
 				}
-				powered_opacity = powered ? .5 : 1;
-				occluded_opacity = occluded ? 1 : 0;
+				powered_opacity = powered ? .5: 1;
+				occluded_opacity = occluded ? 1: 0;
 				o_cell.opacity = Math.min(Math.max(Math.min(angle_opacity, powered_opacity),
 								occluded_opacity),
 								distance_opacity);
@@ -494,6 +556,7 @@ var core = {
 		draw_functions.draw_cells(globals.context, closed_door_cells, defaults.grid_width, "rgba(180,0,0,1)");
 		draw_functions.draw_cells(globals.context, open_door_cells, defaults.grid_width, "rgba(0,200,0,1)");
 		draw_functions.draw_wires(globals.context, wires, defaults.grid_width, "rgba(255,100,100,1)");
+		draw_functions.draw_items(globals.context, items, defaults.grid_width);
 		draw_functions.draw_character(globals.context, globals.character);
 		for (var i = 0; i < globals.objs.length; i++) {
 			var obj = globals.objs[i];
@@ -505,11 +568,14 @@ var core = {
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
-		draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-10}, globals.score);
-		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/100,
+		//draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-10},
+		//				globals.score);
+		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/globals.character.max_health,
 					      {x:globals.screen_bounds.size.width - 20, y:30});
-		draw_functions.draw_healthbar(globals.context, "#00AA00", globals.character.hunger/globals.character.max_hunger,
-					      {x:globals.screen_bounds.size.width - 35, y:30});
+		draw_functions.draw_healthbar(globals.context, "#00AA00",
+					globals.character.hunger/globals.character.max_hunger,
+					{x:globals.screen_bounds.size.width - 35, y:30});
+		draw_functions.draw_inventory(globals.context, globals.inventory, 50);
 		draw_functions.draw_overlay(globals.context, "rgba(255,0,0," +globals.red_overlay_alpha + ")");
 		draw_functions.draw_border(globals.context, 2);
 	},
@@ -532,17 +598,12 @@ var core = {
 			obj.paused = false;
 		}
 	},
-	update : function(dt) {
+	update: function(dt) {
 		globals.score += dt * 10;
 		var new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
 		var dd = {x:0, y:0};
 		var moved = false;
 		var original_cell = globals.character.cell;
-		for (var i = 0; i < globals.kitchens.length; i++) {
-			var kitchen = globals.kitchens[i];
-			var food_rate = kitchen.powered ? 2 : .5;
-			kitchen.food = Math.min(40, kitchen.food + food_rate * dt);
-		}
 		if (globals.keys.w) { dd.y -= dt * 100; }
 		if (globals.keys.s) { dd.y += dt * 100; }
 		globals.character.move(0, dd.y);
@@ -550,25 +611,14 @@ var core = {
 		if (globals.keys.d) { dd.x += dt * 100; }
 		globals.character.move(dd.x, 0) || moved;
 		if (!original_cell.equals(globals.character.cell)) {
+			var item = globals.item_map[mapg.indexof(globals.character.cell)];
+			if (item) {
+				globals.item_map[mapg.indexof(globals.character.cell)] = undefined;
+				globals.inventory.add_item(item.type, item.amount);
+			}
 			core.recalculate_paths();
 		}
-		if (globals.character.cell.room) {
-			var room = globals.character.cell.room;
-			var room_name = room.name;
-			if (room_name == "medical_bay") {
-				var heal_rate = room.powered ? 5 : 1;
-				globals.character.health = Math.min(globals.character.health + heal_rate * dt, 100);
-			}
-			if (room_name == "cargo" || room_name == "kitchen") {
-				if (room.food > 0) {
-					var food_transfered = Math.min(room.food, 10 * dt,
-								globals.character.max_hunger
-								- globals.character.hunger);
-					room.food -= food_transfered;
-					globals.character.hunger += food_transfered;
-				}
-			}
-		}
+		globals.room_func.forEach(function (func) {func(dt);});
 		if (globals.character.hunger > 0) {
 			globals.character.hunger -= dt;
 		} else {
@@ -592,10 +642,118 @@ var core = {
 		}
 		return undefined;
 	}
-}
+};
+
+var rooms = {
+	kitchen: function (room) {
+		var time = 0;
+		return function (dt) {
+			var powered_multiplier = room.powered ? 1: 0;
+			time += powered_multiplier * dt;
+			if (time > 5) {
+				time = 0;
+				var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
+				var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
+				if (!globals.item_map[mapg.indexof(x,y)]) {
+					globals.item_map[mapg.indexof(x,y)] = {type:"food", amount:1};
+				}
+			}
+		}
+	},
+	medical_bay: function (room) {
+		var time = 0;
+		return function (dt) {
+			var powered_multiplier = room.powered ? 1: 0;
+			time += powered_multiplier * dt;
+			if (time > 30) {
+				time = 0;
+				var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
+				var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
+				if (!globals.item_map[mapg.indexof(x,y)]) {
+					globals.item_map[mapg.indexof(x,y)] = {type:"medipack", amount:1};
+				}
+			}
+			if (globals.character.cell.room == room) {
+				globals.character.health = Math.min(globals.character.max_health,
+								globals.character.health + dt * 3);
+			}
+		}
+	},
+	cargo: function (room) {
+		var add_food = function () {
+			var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
+			var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
+			if (!globals.item_map[mapg.indexof(x,y)]) {
+				globals.item_map[mapg.indexof(x,y)] = {type:"food", amount:1};
+			}
+		}
+		while(Math.random() > .2) {
+			add_food();
+		}
+	},
+	default_function: function (room) {
+		var add_item = function (type, amount) {
+			var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
+			var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
+			if (!globals.item_map[mapg.indexof(x,y)]) {
+				globals.item_map[mapg.indexof(x,y)] = {type:type, amount:amount};
+			}
+		}
+		while(Math.random() > .5) {
+			add_item("food",1);
+		}
+		while(Math.random() > .5) {
+			add_item("wire",utilities.random_interval(1,5));
+		}
+	}
+};
+var items = {
+	food: function(item) {
+		var amount = item.quality || 10;
+		globals.character.hunger = Math.min(globals.character.max_hunger, globals.character.hunger + amount);
+		return 1;
+	},
+	health: function(item) {
+		var amount = item.quality || 10;
+		globals.character.health = Math.min(globals.character.max_health, globals.character.health + amount);
+		return 1;
+	},
+	wire: function (item) {
+		var grid_point = core.screen_to_grid_index(globals.mousePos);
+		var next_cell = core.check_position(grid_point.x, grid_point.y);
+		var dx = next_cell.x - globals.current_cell.x;
+		var dy = next_cell.y - globals.current_cell.y;
+		var distance = Math.sqrt(dx*dx + dy*dy);
+		if (next_cell && next_cell.passable && distance < 2.5) {
+			if (!next_cell.wired) {
+				next_cell.wired =  true;
+				globals.wires[next_cell.hash_cell()] = next_cell;
+				mapg.recalculate_power();
+				return 1;
+			}
+		}
+		return 0;
+	},
+	wire_cutter: function (item) {
+		var grid_point = core.screen_to_grid_index(globals.mousePos);
+		var next_cell = core.check_position(grid_point.x, grid_point.y);
+		var dx = next_cell.x - globals.current_cell.x;
+		var dy = next_cell.y - globals.current_cell.y;
+		var distance = Math.sqrt(dx*dx + dy*dy);
+		if (next_cell && next_cell.passable && distance < 2.5) {
+			if (next_cell.wired) {
+				next_cell.wired =  false;
+				delete globals.wires[next_cell.hash_cell()];
+				mapg.recalculate_power();
+				globals.inventory.add_item("wire", 1);
+			}
+		}
+		return 0;
+	}
+};
 
 var utilities = {
-	dfs : function(root, adjacent) {
+	dfs: function(root, adjacent) {
 		var results = new JS.Set([root]);
 		var node_stack = adjacent(root);
 		while (node_stack.length > 0) {
@@ -611,14 +769,14 @@ var utilities = {
 		}
 		return results.entries();
 	},
-	angular_distance : function(a, b) {
+	angular_distance: function(a, b) {
 		var raw = Math.abs(b - a);
 		while (raw > Math.PI * 2) {
 			raw -= Math.PI * 2;
 		}
 		return Math.PI - Math.abs(raw - Math.PI);
 	},
-	signed_angular_distance : function(a, b) {
+	signed_angular_distance: function(a, b) {
 		var dist = utilities.angular_distance(a, b);
 		var d1 = utilities.angular_distance(a + dist, b);
 		var d2 = utilities.angular_distance(a, b + dist);
@@ -628,7 +786,7 @@ var utilities = {
 			return dist;
 		}
 	},
-	bresenham_line : function(a, b) {
+	bresenham_line: function(a, b) {
 		/**
 		 * does a straight line from a to b
 		 * using bresenham's line algorithm
@@ -657,10 +815,10 @@ var utilities = {
 		}
 		return next_cell;
 	},
-	random_interval : function(a, b) {
+	random_interval: function(a, b) {
 		return Math.floor(Math.random() * (b - a) + a);
 	},
-	shuffle_array : function(arr) {
+	shuffle_array: function(arr) {
 		for (var i = arr.length - 1; i >= 0; i--) {
 			var n = utilities.random_interval(0,i);
 			var temp = arr[i];
@@ -669,10 +827,10 @@ var utilities = {
 		}
 		return arr;
 	},
-	interpolate : function (val, y0, x0, y1, x1) {
+	interpolate: function (val, y0, x0, y1, x1) {
 		    return (val-x0)*(y1-y0)/(x1-x0) + y0;
 	},
-	colormap_jet : function(value, extra) {
+	colormap_jet: function(value, extra) {
 		var base = function(val) {
 		    if (val <= -0.75) return 0;
 		    else if (val <= -0.25) return utilities.interpolate( val, 0.0, -0.75, 1.0, -0.25 );
@@ -690,7 +848,7 @@ var utilities = {
 }
 
 var mapg = {
-	hash_room : function(room) {
+	hash_room: function(room) {
 		if (room) {
 			return room.origin.x + ", " + room.origin.y;
 		} else {
@@ -814,7 +972,7 @@ var mapg = {
 		}
 		return [];
 	},
-	occluded : function (from, to) {
+	occluded: function (from, to) {
 		var next_cell = utilities.bresenham_line(from, to);
 		var cell = next_cell();
 		while (cell) {
@@ -825,21 +983,24 @@ var mapg = {
 		}
 		return false;
 	},
-	in_bounds : function (x,y) {
+	in_bounds: function (x,y) {
 		if (y != undefined) {
 			return x >= 0 && x < globals.bounds.width && y >= 0 && y < globals.bounds.height;
 		} else {
 			return x.x >= 0 && x.x < globals.bounds.width && x.y >= 0 && x.y < globals.bounds.height;
 		}
 	},
-	indexof : function(x,y) {
+	cell_at: function(x,y) {
+		return globals.map_grid[mapg.indexof(x, y)];
+	},
+	indexof: function(x,y) {
 		if (y != undefined) {
 			return y * globals.bounds.width + x;
 		} else {
 			return x.y * globals.bounds.width + x.x;
 		}
 	},
-	collect_wiresets : function () {
+	collect_wiresets: function () {
 		var wires = [];
 		var keys = _.map(_.values(globals.wires), function (n) {return n.hash_cell()});
 		var working_keys = keys;
@@ -875,7 +1036,7 @@ var mapg = {
 		});
 		return wiresets;
 	},
-	recalculate_power : function() {
+	recalculate_power: function() {
 		var wiresets = mapg.collect_wiresets();
 		globals.rooms.forEach(function (room) {room.powered = room.power_src > 0;});
 		wiresets.forEach(function (wireset) {
@@ -907,7 +1068,7 @@ var mapg = {
 			});
 		});
 	},
-	generate_room_graph : function(min_rooms, width, height) {
+	generate_room_graph: function(min_rooms, width, height) {
 		var rooms = [];
 		var types_added = {};
 		var tWeight = 0;
@@ -1213,27 +1374,60 @@ var mapg = {
 }
 
 var draw_functions = {
-	draw_bg : function(ctx) {
+	draw_bg: function(ctx) {
 		var cv = globals.canvas[0];
 		ctx.fillStyle = "#000000";
 		ctx.fillRect(0, 0, cv.width, cv.height);
 	},
-	draw_overlay : function(ctx, color) {
+	draw_overlay: function(ctx, color) {
 		var cv = globals.canvas[0];
 		ctx.fillStyle = color;
 		ctx.fillRect(0, 0, cv.width, cv.height);
 	},
-	draw_healthbar : function(ctx, color, percent, offset) {
+	draw_healthbar: function(ctx, color, percent, offset) {
 		var cv = globals.canvas[0];
 		ctx.fillStyle = color;
 		ctx.fillRect(offset.x, offset.y, 10, 200 * percent);
 	},
-	draw_border : function(ctx, width) {
+	draw_items: function(ctx, items, cell_width) {
+		var line_width =  2;
+		ctx.fillStyle = "#BBBB00";
+		for (var i = 0; i < items.length; i++) {
+			var item = items[i];
+			var cell = item.position;
+			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
+			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
+			var width =  cell_width;
+			var height = cell_width;
+			var img = globals.images["g_" + item.item.type];
+			if (img) {
+				ctx.drawImage(img, startX, startY);
+			}
+		}
+	},
+	draw_inventory: function(ctx, items, width) {
+		var i = 0;
+		var offset = {x: 10, y:globals.screen_bounds.size.height - 10 - width};
+		ctx.strokeStyle = "#FFFFFF";
+		ctx.lineWidth = 1;
+		items.forEach(function (item) {
+			var x = offset.x + i * width * 1.4;
+			var y = offset.y;
+			ctx.strokeRect(x, y, width, width);
+			var img = globals.images[item.type];
+			if (img) {
+				ctx.drawImage(img, x+14, y+14);
+			}
+			ctx.fillText(item.amount, x + 2, y + 2);
+			i += 1;
+		});
+	},
+	draw_border: function(ctx, width) {
 		var cv = globals.canvas[0];
 		ctx.strokeStyle = "#000000";
 		ctx.strokeRect(0, 0, cv.width, cv.height);
 	},
-	draw_rooms : function(ctx, rooms, cell_width, line_width) {
+	draw_rooms: function(ctx, rooms, cell_width, line_width) {
 		var cv = globals.canvas[0];
 		for (var i = 0; i < rooms.length; i++) {
 			var room = rooms[i];
@@ -1257,7 +1451,7 @@ var draw_functions = {
 			ctx.strokeRect(startX , startY, width, height);
 		}
 	},
-	draw_wires : function(ctx, cells, cell_width, color, line_width) {
+	draw_wires: function(ctx, cells, cell_width, color, line_width) {
 		if (line_width == undefined) {
 			line_width =  2;
 		}
@@ -1293,7 +1487,7 @@ var draw_functions = {
 			}
 		}
 	},
-	draw_cells : function(ctx, cells, cell_width, color, line_width, op_func) {
+	draw_cells: function(ctx, cells, cell_width, color, line_width, op_func) {
 		if (line_width == undefined) {
 			line_width =  2;
 		}
@@ -1313,7 +1507,7 @@ var draw_functions = {
 					width - line_width * 2, height - line_width * 2);
 		}
 	},
-	draw_character : function(ctx, character, size, color) {
+	draw_character: function(ctx, character, size, color) {
 		var ox = globals.centroid.x - globals.character.origin.x + character.origin.x;
 		var oy = globals.centroid.y - globals.character.origin.y + character.origin.y;
 		size = size || 5;
@@ -1335,13 +1529,13 @@ var draw_functions = {
 			ctx.fill();
 		}
 	},
-	draw_score : function(ctx, offset, score) {
+	draw_score: function(ctx, offset, score) {
 		ctx.font = "bold 20px " + defaults.font;
 		ctx.textBaseline = "bottom";
 		ctx.fillStyle = "#DD0000";
 		ctx.fillText("Score: " + Math.round(score), offset.x, offset.y);
 	},
-	draw_tooltip : function(ctx, start, offset, room) {
+	draw_tooltip: function(ctx, start, offset, room) {
 		var maxW = 0;
 		function getLines(ctx,phrase,maxPxLength) {
 			var wa=phrase.split(" "),
@@ -1379,10 +1573,10 @@ var draw_functions = {
 		var startX = start.x + offset.x;
 		var startY = start.y + offset.y;
 		var name_str = text.replace("_"," ");
-		var lines = getLines(ctx, name_str, 95);
+		var lines = getLines(ctx, name_str, 200);
 		var lineHeight = 14;
 		var maxH = lines.length * lineHeight;
-		ctx.font = "14 px " + defaults.font;
+		ctx.font = "bold 16px " + defaults.font;
 		ctx.fillStyle = "rgba(100,150,255,.7)";
 		ctx.fillRect(startX, startY, maxW + 20, maxH + 10);
 		ctx.fillStyle = "#000000";
