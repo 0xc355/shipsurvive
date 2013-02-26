@@ -15,27 +15,29 @@ containers = {};
 
 /* core functions */
 var core = {
-	load_image: function(name, src) {
+	load_image: function(name) {
 		if (!globals.images[name]) {
 			var img = new Image();
-			img.src = src;
+			img.src = "img/icon/" + name + ".png";
 			img.onload = function () {
 				globals.images[name] = img;
+			};
+			var spr = new Image();
+			spr.src = "img/sprite/" + name + ".png";
+			spr.onload = function () {
+				globals.images["g_" + name] = spr;
 			};
 		}
 	},
 	load_images: function() {
-		core.load_image("g_food", "img/sprite/food.png");
-		core.load_image("g_medipack", "img/sprite/medipack.png");
-		core.load_image("g_wire", "img/sprite/wire.png");
-		core.load_image("g_wire_cutter", "img/sprite/wire_cutter.png");
-		core.load_image("g_oxygen_tank", "img/sprite/oxygen_tank.png");
-		core.load_image("g_breach", "img/sprite/breach.png");
-		core.load_image("food", "img/icon/food.png");
-		core.load_image("medipack", "img/icon/medipack.png");
-		core.load_image("wire", "img/icon/wire.png");
-		core.load_image("wire_cutter", "img/icon/wire_cutter.png");
-		core.load_image("wire_cutter", "img/icon/oxygen_tank.png");
+		core.load_image("food");
+		core.load_image("medipack");
+		core.load_image("wire");
+		core.load_image("wire_cutter");
+		core.load_image("oxygen_tank");
+		core.load_image("empty_tank");
+		core.load_image("welder");
+		core.load_image("breach");
 	},
 	load_classes: function() {
 		core.Cell = new JS.Class({
@@ -663,7 +665,7 @@ var core = {
 			var oxygen_taken = Math.min(oxygen_req, original_cell.oxygen);
 			original_cell.oxygen -= oxygen_taken;
 			oxygen_req -= oxygen_taken;
-			if (original_cell.oxygen > 5) {
+			if (original_cell.oxygen > 2) {
 				var oxygen_supplied = Math.min(dt * 5, Math.max(0, Math.min(globals.character.max_oxygen
 							       - globals.character.oxygen,
 							       original_cell.oxygen)));
@@ -768,14 +770,20 @@ var rooms = {
 				globals.item_map[mapg.indexof(x,y)] = {type:type, amount:amount};
 			}
 		}
-		while(Math.random() > .5) {
+		while(Math.random() < .5) {
 			add_item("food",1);
 		}
-		while(Math.random() > .5) {
+		while(Math.random() < .5) {
 			add_item("wire",utilities.random_interval(1,5));
 		}
-		while(Math.random() > .9) {
+		while(Math.random() < .2) {
 			add_item("oxygen_tank",1);
+		}
+		while(Math.random() < .2) {
+			add_item("empty_tank",1);
+		}
+		while(Math.random() < .2) {
+			add_item("welder",1);
 		}
 	}
 };
@@ -785,10 +793,36 @@ var items = {
 		globals.character.hunger = Math.min(globals.character.max_hunger, globals.character.hunger + amount);
 		return 1;
 	},
+	empty_tank: function(item) {
+		if (globals.character.cell.oxygen > 10) {
+			globals.character.cell.oxygen -= 10;
+			globals.inventory.add_item("oxygen_tank", 1);
+			return 1;
+		}
+		return 0;
+	},
 	oxygen_tank: function(item) {
-		var amount = item.quality || 10;
-		globals.character.oxygen = Math.min(globals.character.max_oxygen, globals.character.oxygen + amount);
-		return 1;
+		var amount = item.quality || 25;
+		if (globals.character.oxygen < globals.character.max_oxygen - 1) {
+			globals.character.oxygen = Math.min(globals.character.max_oxygen, globals.character.oxygen + amount);
+			globals.inventory.add_item("empty_tank", 1);
+			return 1;
+		}
+		return 0;
+	},
+	welder: function(item) {
+		var grid_point = core.screen_to_grid_index(globals.mousePos);
+		var next_cell = core.check_position(grid_point.x, grid_point.y);
+		var dx = next_cell.x - globals.current_cell.x;
+		var dy = next_cell.y - globals.current_cell.y;
+		var distance = Math.sqrt(dx*dx + dy*dy);
+		if (next_cell && next_cell.passable && distance < 2.5) {
+			if (next_cell.breach) {
+				next_cell.breach = false;
+				return 1;
+			}
+		}
+		return 0;
 	},
 	medipack: function(item) {
 		var amount = item.quality || 10;
