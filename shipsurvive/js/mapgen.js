@@ -6,7 +6,7 @@ defaults = {
 	background: 'white',
 	grid_offset:{"x":0, "y":0},
 	grid_width: 20,
-	breach_chance: .05,
+	breach_chance: .02,
 	room_min: 5,
 	room_max: 10,
 	font: 'Cutive Mono',
@@ -44,7 +44,7 @@ var core = {
 			initialize: function(x,y) {
 				this.x = x;
 				this.y = y;
-				this.oxygen = 0;
+				this.oxygen = 3;
 				this.type = "open";
 				this.breach = false;
 				this.passable = true;
@@ -660,7 +660,7 @@ var core = {
 		} else {
 			globals.character.health -= dt * 3;
 		}
-		var oxygen_req = dt;
+		var oxygen_req = dt + (Math.abs(dd.x) + Math.abs(dd.y)) / 50;
 		if (original_cell.oxygen > 0) {
 			var oxygen_taken = Math.min(oxygen_req, original_cell.oxygen);
 			original_cell.oxygen -= oxygen_taken;
