@@ -658,7 +658,7 @@ var core = {
 		if (globals.character.hunger > 0) {
 			globals.character.hunger -= dt;
 		} else {
-			core.reset();
+			globals.character.health -= dt * 3;
 		}
 		var oxygen_req = dt;
 		if (original_cell.oxygen > 0) {
