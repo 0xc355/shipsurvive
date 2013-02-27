@@ -587,7 +587,7 @@ var core = {
 		draw_functions.draw_cells(globals.context, non_occluded_cells, defaults.grid_width, "rgba(255,0,0,1)", 0,
 					  function (cell) {
 						  var gcell = mapg.cell_at(cell.x, cell.y);
-						  var op = Math.max(0, 1 - gcell.oxygen/5) * .3;
+						  var op = Math.max(0, 1 - Math.max(0,gcell.oxygen)/5) * .3;
 						  var opacity = gcell.passable ? op : 0;
 						  return opacity;
 					  }, "255,0,0");
@@ -753,11 +753,11 @@ var rooms = {
 	},
 	life_support: function (room) {
 		return function (dt) {
-			var multiplier = room.powered ? 10 : 1;
-			for (var x = room.origin.x; x < room.origin.x + room.dimensions.width; x++) {
-				for (var y = room.origin.y; y < room.origin.y + room.dimensions.height; y++) {
+			var multiplier = room.powered ? 10 : 3;
+			for (var x = room.origin.x; x < room.origin.x + room.dimensions.width; x+= 4) {
+				for (var y = room.origin.y; y < room.origin.y + room.dimensions.height; y+= 4) {
 					var cell = mapg.cell_at(x,y);
-					cell.oxygen = Math.min(cell.oxygen + dt * multiplier/2, 5 * multiplier);
+					cell.oxygen = Math.min(cell.oxygen + dt * multiplier/3, 5 * multiplier);
 				}
 			}
 		};
@@ -1128,7 +1128,8 @@ var mapg = {
 				var cell = mapg.cell_at(x,y);
 				if (cell && cell.passable) {
 					var escaped_oxygen = cell.breach ? 5 : 0;
-					cell.oxygen = Math.max(cell.next_oxygen - escaped_oxygen, 0);
+					var min_oxygen = cell.breach ? -20 : 0;
+					cell.oxygen = Math.max(cell.next_oxygen - escaped_oxygen, min_oxygen);
 				}
 			}
 		}
@@ -1568,7 +1569,7 @@ var draw_functions = {
 			var index = globals.room_types[room.name].type_index;
 			var col = (index/globals.room_data.length)*2 - 1;
 			if (room.powered) {
-				ctx.fillStyle = utilities.colormap_jet(col, 2.0);
+				ctx.fillStyle = "#909090";
 			} else {
 				ctx.fillStyle = "#404040";
 			}
