@@ -263,6 +263,8 @@ var core = {
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
 		globals.character.max_oxygen = 25;
+		globals.character.max_temperature = 20;
+		globals.character.temperature = 10;
 		globals.character.health = globals.character.max_health;
 		globals.character.hunger = globals.character.max_hunger;
 		globals.character.oxygen = globals.character.max_oxygen;
@@ -600,12 +602,15 @@ var core = {
 		//				globals.score);
 		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/globals.character.max_health,
 					      {x:globals.screen_bounds.size.width - 20, y:30});
+		draw_functions.draw_heatbar(globals.context,
+					globals.character.temperature/globals.character.max_temperature,
+					{x:globals.screen_bounds.size.width - 35, y:30}, 2);
 		draw_functions.draw_healthbar(globals.context, "#00AA00",
 					globals.character.hunger/globals.character.max_hunger,
-					{x:globals.screen_bounds.size.width - 35, y:30});
+					{x:globals.screen_bounds.size.width - 50, y:30});
 		draw_functions.draw_healthbar(globals.context, "#BB00BB",
 					globals.character.oxygen/globals.character.max_oxygen,
-					{x:globals.screen_bounds.size.width - 50, y:30});
+					{x:globals.screen_bounds.size.width - 65, y:30});
 		draw_functions.draw_inventory(globals.context, globals.inventory, 50);
 		draw_functions.draw_overlay(globals.context, "rgba(255,0,0," +globals.red_overlay_alpha + ")");
 		draw_functions.draw_border(globals.context, 2);
@@ -655,12 +660,44 @@ var core = {
 			core.recalculate_paths();
 		}
 		globals.room_func.forEach(function (func) {func(dt);});
+		var moved_distance = dd.x != 0 || dd.y != 0 ? 1 : 0;
 		if (globals.character.hunger > 0) {
 			globals.character.hunger -= dt;
 		} else {
 			globals.character.health -= dt * 3;
 		}
-		var oxygen_req = dt + (Math.abs(dd.x) + Math.abs(dd.y)) / 50;
+		var m_temp = globals.character.max_temperature;
+		var temperature = 0;
+		if (globals.character.cell.room) {
+			temperature += globals.character.cell.room.heat;
+			temperature += globals.character.cell.room.powered ? 1 : 0;
+		} else if (globals.character.cell.type == "door") {
+			var neighbors = globals.character.cell.grid_neighbors(function (cell) {
+				return cell && cell.passable;
+			});
+			var rooms = _.map(neighbors, function (cell) {return cell.room;});
+			var temp = 0
+			rooms.forEach(function (room) {temp += room.powered ? 1 : 0;});
+			temperature += temp / rooms.length; 
+		}
+		temperature += moved_distance / 2;
+
+		var temperature_differential = globals.character.temperature
+						- m_temp * .5;
+		if (temperature_differential > 0) {
+			temperature -= Math.min(.6, temperature_differential * .1);
+		}
+		globals.character.temperature = Math.min(Math.max(0,
+						globals.character.temperature + (temperature - 1) * dt),
+						m_temp);
+	
+		if (globals.character.temperature < m_temp * .2) {
+			globals.character.health -= ((m_temp * .2) - globals.character.temperature) * 2 * dt;
+		}
+		if (globals.character.temperature > m_temp * .8) {
+			globals.character.health -= (-(m_temp * .8) + globals.character.temperature) * 2 * dt;
+		}
+		var oxygen_req = dt * (1 + moved_distance * 2);
 		if (original_cell.oxygen > 0) {
 			var oxygen_taken = Math.min(oxygen_req, original_cell.oxygen);
 			original_cell.oxygen -= oxygen_taken;
@@ -705,8 +742,18 @@ var core = {
 };
 
 var rooms = {
+	freezer: function (room) {
+		return function (dt) {
+			if (room.powered) {
+				room.heat = -3;
+			} else {
+				room.heat = -.5;
+			}
+		};
+	},
 	kitchen: function (room) {
 		var time = 0;
+		room.heat = .2;
 		return function (dt) {
 			var powered_multiplier = room.powered ? 1: 0;
 			time += powered_multiplier * dt;
@@ -1473,9 +1520,11 @@ var mapg = {
 			room.connections = [];
 			if (globals.powered_rooms[room.type]) {
 				room.powered = true;
+				room.heat = 1;
 				room.power_src = globals.powered_rooms[room.type];
 			} else {
 				room.powered = false;
+				room.heat = 0;
 				room.power_src = 0;
 			}
 			var dead_cells = place_room(room, map_grid);
@@ -1518,6 +1567,17 @@ var draw_functions = {
 		var cv = globals.canvas[0];
 		ctx.fillStyle = color;
 		ctx.fillRect(offset.x, offset.y, 10, 200 * percent);
+	},
+	draw_heatbar: function(ctx, percent, offset, width) {
+		var cv = globals.canvas[0];
+		var grad = ctx.createLinearGradient(0,0,0,200);
+		for (var i = 0; i < 1; i += .1) {
+			grad.addColorStop(i, utilities.colormap_jet(1 - i * 2, .8));
+		}
+		ctx.fillStyle = grad;
+		ctx.fillRect(offset.x, offset.y, 10, 200);
+		ctx.fillStyle = "white";
+		ctx.fillRect(offset.x, offset.y + (1 - percent) * 200 - width/2, 10, width);
 	},
 	draw_items: function(ctx, items, cell_width) {
 		var line_width =  2;
