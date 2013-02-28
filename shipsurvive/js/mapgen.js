@@ -46,7 +46,7 @@ var core = {
 			initialize: function(x,y) {
 				this.x = x;
 				this.y = y;
-				this.oxygen = 3;
+				this.oxygen = 5;
 				this.type = "open";
 				this.breach = 0;
 				this.passable = true;
@@ -293,12 +293,9 @@ var core = {
 					    globals.character.cell.y + dy);
 		};
 		globals.character.random_room();
-		while (globals.character.cell.room.type != "life_support") {
-			globals.character.random_room();
-		}
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
-		globals.character.max_oxygen = 25;
+		globals.character.max_oxygen = 5;
 		globals.character.max_temperature = 20;
 		globals.character.temperature = 10;
 		globals.character.health = globals.character.max_health;
@@ -719,7 +716,7 @@ var core = {
 		}
 		var m_temp = globals.character.max_temperature;
 		var temperature = 0;
-		var oxygen_req = dt * (1 + moved_distance * 2);
+		var oxygen_req = dt * (.5 + moved_distance);
 
 		var welder_flame_pos = globals.character.get_welder_flame();
 
@@ -745,7 +742,7 @@ var core = {
 			original_cell.oxygen -= oxygen_taken;
 			oxygen_req -= oxygen_taken;
 			if (original_cell.oxygen > 2) {
-				var oxygen_supplied = Math.min(dt * 5, Math.max(0, Math.min(globals.character.max_oxygen
+				var oxygen_supplied = Math.min(dt * 1, Math.max(0, Math.min(globals.character.max_oxygen
 							       - globals.character.oxygen,
 							       original_cell.oxygen)));
 				globals.character.oxygen += oxygen_supplied;
@@ -766,7 +763,7 @@ var core = {
 			if (Math.random() < welder_flame_pos.oxygen * dt * .01) {
 				mapg.add_fire(welder_flame_pos);
 			}
-			oxygen_req += dt * 3;
+			oxygen_req += dt * 1;
 		}
 		if (oxygen_req > 0) {
 			var oxygen_taken = Math.min(oxygen_req, globals.character.oxygen);
