@@ -246,6 +246,7 @@ var core = {
 		globals.mousePos = {"x":0, "y":0};
 		globals.room_types = {};
 		globals.objs = [];
+		globals.fires = [];
 		globals.item_map = [];
 		globals.diffuse_counter = 0;
 		globals.inventory = [
@@ -533,6 +534,7 @@ var core = {
 		var items = [];
 		var wires = [];
 		var breaches = [];
+		var fires = [];;
 
 		var screen_end = {
 			x:globals.screen_bounds.origin.x + globals.screen_bounds.size.width,
@@ -563,6 +565,9 @@ var core = {
 					wires.push(cell);
 				}
 				var o_cell = {x:x,y:y};
+				if (cell.fire) {
+					fires.push(cell.fire);
+				}
 				var item = globals.item_map[mapg.indexof(x,y)];
 				if (item) {
 					items.push({position:cell, item:item});
@@ -610,6 +615,7 @@ var core = {
 		draw_functions.draw_items(globals.context, breaches, defaults.grid_width);
 		draw_functions.draw_wires(globals.context, wires, defaults.grid_width, "rgba(255,100,100,1)");
 		draw_functions.draw_items(globals.context, items, defaults.grid_width);
+		draw_functions.draw_fires(globals.context, fires, defaults.grid_width);
 		draw_functions.draw_character(globals.context, globals.character);
 		for (var i = 0; i < globals.objs.length; i++) {
 			var obj = globals.objs[i];
@@ -683,6 +689,7 @@ var core = {
 			mapg.diffuse_oxygen();
 			globals.diffuse_counter = 0;
 		}
+		mapg.propagate_flames(dt);
 		if (globals.keys.w) { dd.y -= dt * 100; }
 		if (globals.keys.s) { dd.y += dt * 100; }
 		globals.character.move(0, dd.y);
@@ -713,7 +720,7 @@ var core = {
 		if (globals.character.cell.room) {
 			temperature += globals.character.cell.room.heat;
 			temperature += globals.character.cell.room.powered ? 1 : 0;
-		} else if (globals.character.cell.type == "door") {
+		} else {
 			var neighbors = globals.character.cell.grid_neighbors(function (cell) {
 				return cell && cell.passable;
 			});
@@ -723,6 +730,9 @@ var core = {
 			temperature += temp / rooms.length; 
 		}
 		temperature += moved_distance / 2;
+		temperature += globals.character.cell.fire ? 10 : 0;
+		temperature += globals.character.cell.grid_neighbors(
+					function (o) {return o && o.passable && o.fire;}).length * 5;
 
 		if (original_cell.oxygen > 0) {
 			var oxygen_taken = Math.min(oxygen_req, original_cell.oxygen);
@@ -746,6 +756,9 @@ var core = {
 				if (welder_flame_pos.door_health == 0) {
 					welder_flame_pos.type = "open";
 				}
+			}
+			if (Math.random() < welder_flame_pos.oxygen * dt * .01) {
+				mapg.add_fire(welder_flame_pos);
 			}
 			oxygen_req += dt * 3;
 		}
@@ -1222,6 +1235,43 @@ var mapg = {
 			return x.y * globals.bounds.width + x.x;
 		}
 	},
+	add_fire: function (cell) {
+		if (cell.fire) {return;}
+		var new_fire = {cell:cell, spread:0};
+		globals.fires.push(new_fire);
+		cell.fire = new_fire;
+	},
+	propagate_flames: function(dt) {
+		var dead_flames = [];
+		var new_flames = [];
+		globals.fires.forEach(function (flame) {
+			flame.cell.oxygen = Math.max(0, flame.cell.oxygen - 2.5 * dt);
+			if (flame.cell.oxygen == 0) {
+				dead_flames.push(flame);
+				flame.cell.fire = false;
+			} else {
+				flame.spread += dt;
+				if (flame.spread > 2) {
+					flame.spread = 0;
+					var others = flame.cell.grid_neighbors(function (cell) {
+						return cell && cell.passable && !cell.fire && cell.oxygen > 2;});
+					if (others.length > 0) {
+						var s_index = utilities.random_interval(0,others.length);
+						var spreaded = others[s_index];
+						var new_fire = {cell:spreaded, spread:0};
+						new_flames.push(new_fire);
+						spreaded.fire = new_fire;
+					}
+				}
+			}
+		});
+		if (dead_flames.length > 0)
+		console.log(globals.fires, dead_flames);
+		globals.fires = _.difference(globals.fires, dead_flames);
+		if (dead_flames.length > 0)
+		console.log(globals.fires);
+		globals.fires = globals.fires.concat(new_flames);
+	},
 	diffuse_oxygen: function() {
 		for (var y = 1; y < globals.bounds.height - 1; y++) {
 			for (var x = 1; x < globals.bounds.width - 1; x++) {
@@ -1642,6 +1692,21 @@ var draw_functions = {
 		ctx.fillRect(offset.x, offset.y, 10, 200);
 		ctx.fillStyle = "white";
 		ctx.fillRect(offset.x, offset.y + (1 - percent) * 200 - width/2, 10, width);
+	},
+	draw_fires: function(ctx, items, cell_width) {
+		var line_width =  2;
+		ctx.fillStyle = "#BBBB00";
+		for (var i = 0; i < items.length; i++) {
+			var cell = items[i].cell;
+			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
+			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
+			var width =  cell_width;
+			var height = cell_width;
+				var img = globals.images["g_fire"];
+			if (img) {
+				ctx.drawImage(img, startX, startY);
+			}
+		}
 	},
 	draw_items: function(ctx, items, cell_width) {
 		var line_width =  2;
