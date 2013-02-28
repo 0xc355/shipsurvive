@@ -7,6 +7,7 @@ defaults = {
 	grid_offset:{"x":0, "y":0},
 	grid_width: 20,
 	breach_chance: .02,
+	base_oxygen_level: 5,
 	room_min: 5,
 	room_max: 10,
 	font: 'Cutive Mono',
@@ -46,7 +47,7 @@ var core = {
 			initialize: function(x,y) {
 				this.x = x;
 				this.y = y;
-				this.oxygen = 5;
+				this.oxygen = defaults.base_oxygen_level;
 				this.type = "open";
 				this.breach = 0;
 				this.passable = true;
@@ -343,8 +344,9 @@ var core = {
 		globals.wires = [];
 		globals.powered_rooms = {mini_reactor:300, large_reactor:1000};
 		$("#size_slider").slider({max:360, min:0, step:1, value:globals.light_cone, slide:core.change_size});
-		$("#noise_slider").slider({max:40, min:10, step:2, value:20, slide:core.change_noise});
+		$("#noise_slider").slider({max:100, min:0, step:1, value:5, slide:core.change_noise});
 		$("p#size_display").text("Light Size: " + globals.light_cone);
+		$("p#noise_display").text("Oxygen level: " + globals.base_oxygen_level);
 
 		var ratio = core.hiDPIRatio();
 		if (ratio != 1) {
@@ -414,9 +416,9 @@ var core = {
 		$("p#size_display").text("Light Size: " + globals.light_cone);
 	},
 	change_noise: function(event, ui) {
-		defaults.grid_width = Math.round(ui.value);
-		var val = Math.round(ui.valu25);
-		$("p#noise_display").text("25ell Length: " + val);
+		defaults.base_oxygen_level = Math.round(ui.value);
+		var val = Math.round(ui.value);
+		$("p#noise_display").text("Oxygen Level: " + val);
 	},
 	mouse_down: function (evt) {
 		if (evt.which == 3) {globals.keys.rmouse = true;}
