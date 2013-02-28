@@ -245,6 +245,7 @@ var core = {
 		globals.keys = {"w":false, "a":false, "s":false, "d":false};
 		globals.mousePos = {"x":0, "y":0};
 		globals.room_types = {};
+		globals.pause = false;
 		globals.objs = [];
 		globals.fires = [];
 		globals.item_map = [];
@@ -292,6 +293,9 @@ var core = {
 					    globals.character.cell.y + dy);
 		};
 		globals.character.random_room();
+		while (globals.character.cell.room.type != "life_support") {
+			globals.character.random_room();
+		}
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
 		globals.character.max_oxygen = 25;
@@ -358,7 +362,7 @@ var core = {
 		}
 		globals.context.font = defaults.font;
 		cv.addEventListener('click', core.toggle_door, true);
-		cv.addEventListener('contextmenu', core.toggle_wire, true);
+		cv.addEventListener('contextmenu', core.pause, true);
 		cv.addEventListener('mousedown', core.mouse_down, true);
 		cv.addEventListener('mouseup', core.mouse_up, true);
 		cv.addEventListener('keydown', core.keydown_handler, true);
@@ -377,13 +381,11 @@ var core = {
 		core.reset();
 
 		cv.addEventListener('mousemove', function(evt) {
+			if (globals.pause) {return;}
 			globals.mousePos = getMousePos(cv, evt);
 			globals.character.facing = 
 				Math.atan2(globals.mousePos.y - globals.centroid.y,
 					 globals.mousePos.x - globals.centroid.x);
-			if (globals.keys.rmouse) {
-				core.toggle_wire();
-			}
 		}, false);
 		window.requestAnimFrame = (function(){
 			return  window.requestAnimationFrame       || 
@@ -457,6 +459,9 @@ var core = {
 		globals.place_next_room = mapg.generate_room_graph(globals.room_size,
 					globals.bounds.width, globals.bounds.height);
 		while(globals.place_next_room()) {}
+	},
+	pause: function () {
+		globals.pause = !globals.pause;
 	},
 	toggle_wire: function () {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
@@ -638,7 +643,7 @@ var core = {
 		}
 		draw_functions.draw_cells(globals.context, non_occluded_cells,
 						defaults.grid_width, "rgba(0,0,0,1)", -1,
-						function (cell) {return cell.opacity;}, "0,0,0");
+						function (cell) {return globals.pause ? 1 :cell.opacity;}, "0,0,0");
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
@@ -679,6 +684,7 @@ var core = {
 		}
 	},
 	update: function(dt) {
+		if (globals.pause) {return;}
 		globals.score += dt * 10;
 		var new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
 		var dd = {x:0, y:0};
