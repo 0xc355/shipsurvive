@@ -31,6 +31,8 @@ var core = {
 	},
 	load_images: function() {
 		core.load_image("food");
+		core.load_image("fire");
+		core.load_image("welder_fire");
 		core.load_image("medipack");
 		core.load_image("wire");
 		core.load_image("wire_cutter");
@@ -46,10 +48,11 @@ var core = {
 				this.y = y;
 				this.oxygen = 3;
 				this.type = "open";
-				this.breach = false;
+				this.breach = 0;
 				this.passable = true;
 				this.powered = false;
 				this.power_source = false;
+				this.fire = 0;
 				this.neighboring_rooms = [];
 			},
 			hash_cell: function() {
@@ -159,6 +162,8 @@ var core = {
 			initialize: function () {
 				this.callSuper();
 				this.reset_speed();
+				this.max_health = 2;
+				this.health = this.max_health;
 			},
 			corner_blocked: function (from, to) {
 				var dx = Math.min(Math.max(to.x - from.x,-1), 1);
@@ -205,7 +210,13 @@ var core = {
 						}
 					}
 				}
-				if (this.cell == globals.character.cell) {
+				if (this.cell == globals.character.get_welder_flame()) {
+					this.health -= dt;
+					if (this.health < 0) {
+						this.health = this.max_health;
+						this.random_room();
+					}
+				} else if (this.cell == globals.character.cell) {
 					globals.red_overlay_alpha = .7;
 					globals.character.health -= 25;
 					this.random_room();
@@ -239,6 +250,7 @@ var core = {
 		globals.diffuse_counter = 0;
 		globals.inventory = [
 			{type:"wire_cutter", amount:1},
+			{type:"welder", amount:1},
 			{type:"medipack", amount: 5}
 		];
 		globals.inventory.add_item = function (type, amount) {
@@ -259,6 +271,25 @@ var core = {
 			hostile.random_room();
 		}
 		globals.character = new core.Actor("player", 0, 0);
+		globals.character.welder = 0;
+		globals.character.get_welder_flame = function () {
+			var dx = Math.cos(globals.character.facing);
+			var dy = Math.sin(globals.character.facing);
+			if (Math.abs(Math.abs(dx) - Math.abs(dy)) < .2) {
+				dx = Math.round(dx/Math.abs(dx));
+				dy = Math.round(dy/Math.abs(dy));
+			} else {
+				if (Math.abs(dx) < Math.abs(dy)) {
+					dx = 0;
+					dy = Math.round(dy/Math.abs(dy));
+				} else {
+					dx = Math.round(dx/Math.abs(dx));
+					dy = 0;
+				}
+			}
+			return mapg.cell_at(globals.character.cell.x + dx,
+					    globals.character.cell.y + dy);
+		};
 		globals.character.random_room();
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
@@ -528,7 +559,6 @@ var core = {
 				} else if (cell.type == "wall") {
 					wall_cells.push(cell);
 				}
-
 				if (cell.wired) {
 					wires.push(cell);
 				}
@@ -551,7 +581,7 @@ var core = {
 				} else {
 					angle_opacity = 1;
 				}
-				if (cell.breach) {
+				if (cell.breach > 0) {
 					breaches.push({position:cell, item:{type:"breach"}});
 				}
 
@@ -593,8 +623,16 @@ var core = {
 						  var opacity = gcell.passable ? op : 0;
 						  return opacity;
 					  }, "255,0,0");
+		if (globals.character.welder > 0) {
+			var welder_flame_pos = globals.character.get_welder_flame();
+			if (welder_flame_pos && welder_flame_pos.type != "wall") {
+				draw_functions.draw_items(globals.context, [{item:{type:"welder_fire"},
+							  position:welder_flame_pos}], defaults.grid_width);
+			}
+		}
 		draw_functions.draw_cells(globals.context, non_occluded_cells,
-					  defaults.grid_width, "rgba(0,0,0,1)", -1, function (cell) {return cell.opacity}, "0,0,0");
+						defaults.grid_width, "rgba(0,0,0,1)", -1,
+						function (cell) {return cell.opacity;}, "0,0,0");
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
@@ -668,6 +706,10 @@ var core = {
 		}
 		var m_temp = globals.character.max_temperature;
 		var temperature = 0;
+		var oxygen_req = dt * (1 + moved_distance * 2);
+
+		var welder_flame_pos = globals.character.get_welder_flame();
+
 		if (globals.character.cell.room) {
 			temperature += globals.character.cell.room.heat;
 			temperature += globals.character.cell.room.powered ? 1 : 0;
@@ -681,6 +723,44 @@ var core = {
 			temperature += temp / rooms.length; 
 		}
 		temperature += moved_distance / 2;
+
+		if (original_cell.oxygen > 0) {
+			var oxygen_taken = Math.min(oxygen_req, original_cell.oxygen);
+			original_cell.oxygen -= oxygen_taken;
+			oxygen_req -= oxygen_taken;
+			if (original_cell.oxygen > 2) {
+				var oxygen_supplied = Math.min(dt * 5, Math.max(0, Math.min(globals.character.max_oxygen
+							       - globals.character.oxygen,
+							       original_cell.oxygen)));
+				globals.character.oxygen += oxygen_supplied;
+				original_cell.oxygen -= oxygen_supplied;
+			}
+		}
+		if (globals.character.welder > 0 && welder_flame_pos) {
+			temperature += 2;
+			if (welder_flame_pos.breach > 0) {
+				welder_flame_pos.breach = Math.max(0, welder_flame_pos.breach - dt);
+			}
+			if (welder_flame_pos.door_health > 0) {
+				welder_flame_pos.door_health = Math.max(0, welder_flame_pos.door_health - dt);
+				if (welder_flame_pos.door_health == 0) {
+					welder_flame_pos.type = "open";
+				}
+			}
+			oxygen_req += dt * 3;
+		}
+		if (oxygen_req > 0) {
+			var oxygen_taken = Math.min(oxygen_req, globals.character.oxygen);
+			globals.character.oxygen -= oxygen_taken;
+			oxygen_req -= oxygen_taken;
+		}
+		if (oxygen_req > 0) {
+			globals.character.health -= oxygen_req * 5;
+		}
+		for (var i = 0; i < globals.objs.length; i++) {
+			var obj = globals.objs[i];
+			obj.update_function(dt);
+		}
 
 		var temperature_differential = globals.character.temperature
 						- m_temp * .5;
@@ -696,31 +776,6 @@ var core = {
 		}
 		if (globals.character.temperature > m_temp * .8) {
 			globals.character.health -= (-(m_temp * .8) + globals.character.temperature) * 2 * dt;
-		}
-		var oxygen_req = dt * (1 + moved_distance * 2);
-		if (original_cell.oxygen > 0) {
-			var oxygen_taken = Math.min(oxygen_req, original_cell.oxygen);
-			original_cell.oxygen -= oxygen_taken;
-			oxygen_req -= oxygen_taken;
-			if (original_cell.oxygen > 2) {
-				var oxygen_supplied = Math.min(dt * 5, Math.max(0, Math.min(globals.character.max_oxygen
-							       - globals.character.oxygen,
-							       original_cell.oxygen)));
-				globals.character.oxygen += oxygen_supplied;
-				original_cell.oxygen -= oxygen_supplied;
-			}
-		}
-		if (oxygen_req > 0) {
-			var oxygen_taken = Math.min(oxygen_req, globals.character.oxygen);
-			globals.character.oxygen -= oxygen_taken;
-			oxygen_req -= oxygen_taken;
-		}
-		if (oxygen_req > 0) {
-			globals.character.health -= oxygen_req * 5;
-		}
-		for (var i = 0; i < globals.objs.length; i++) {
-			var obj = globals.objs[i];
-			obj.update_function(dt);
 		}
 		if (globals.character.health < 0) {
 			core.reset();
@@ -858,16 +913,24 @@ var items = {
 		return 0;
 	},
 	welder: function(item) {
-		var grid_point = core.screen_to_grid_index(globals.mousePos);
+		/*var grid_point = core.screen_to_grid_index(globals.mousePos);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
 		var dx = next_cell.x - globals.current_cell.x;
 		var dy = next_cell.y - globals.current_cell.y;
 		var distance = Math.sqrt(dx*dx + dy*dy);
 		if (next_cell && next_cell.passable && distance < 2.5) {
-			if (next_cell.breach) {
-				next_cell.breach = false;
+			if (next_cell.breach > 0) {
+				next_cell.breach = Math.max(0, next_cell.breach - 1);
 				return 1;
 			}
+		}*/
+		item.in_use = !item.in_use;
+		if (item.in_use) {
+			console.log("welder on");
+			globals.character.welder += 1;
+		} else {
+			console.log("welder off");
+			globals.character.welder -= 1;
 		}
 		return 0;
 	},
@@ -1174,8 +1237,8 @@ var mapg = {
 			for (var x = 1; x < globals.bounds.width - 1; x++) {
 				var cell = mapg.cell_at(x,y);
 				if (cell && cell.passable) {
-					var escaped_oxygen = cell.breach ? 5 : 0;
-					var min_oxygen = cell.breach ? -20 : 0;
+					var escaped_oxygen = cell.breach * 5;
+					var min_oxygen = cell.breach * -20;
 					cell.oxygen = Math.max(cell.next_oxygen - escaped_oxygen, min_oxygen);
 				}
 			}
@@ -1366,7 +1429,7 @@ var mapg = {
 					if (cell) {
 						cells_displaced.add(cell);
 					} else {
-						var breach = Math.random() < defaults.breach_chance;
+						var breach = Math.random() < defaults.breach_chance ? Math.random() + 1 : 0;
 						cell = new core.Cell(x,y);
 						cell.breach = breach;
 						map_grid[mapg.indexof(x,y)] = cell;
@@ -1451,6 +1514,7 @@ var mapg = {
 				if (doors) {
 					var cell = doors[utilities.random_interval(0,doors.length)];
 					cell.type = "door";
+					cell.door_health = 5;
 					cell.passable = utilities.random_interval(0,2) == 1;
 					wall_set.remove(cell);
 					room.connections.push({room:connecting_room, door:cell});
@@ -1598,10 +1662,15 @@ var draw_functions = {
 	draw_inventory: function(ctx, items, width) {
 		var i = 0;
 		var offset = {x: 10, y:globals.screen_bounds.size.height - 10 - width};
-		ctx.strokeStyle = "#FFFFFF";
 		ctx.fillStyle = "#00BB00";
-		ctx.lineWidth = 1;
 		items.forEach(function (item) {
+			if (item.in_use) {
+				ctx.strokeStyle = "#FFFF66";
+				ctx.lineWidth = 2;
+			} else {
+				ctx.strokeStyle = "#FFFFFF";
+				ctx.lineWidth = 1;
+			}
 			var x = offset.x + i * width * 1.4;
 			var y = offset.y;
 			ctx.strokeRect(x, y, width, width);
