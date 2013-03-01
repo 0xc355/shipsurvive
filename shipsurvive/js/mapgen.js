@@ -928,7 +928,7 @@ var buildings = {
 		}
 	},
 	reactor: function(building) {
-		building.power = 100;
+		building.power = 50;
 		return function (dt) {};
 	}
 };
