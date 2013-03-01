@@ -33,6 +33,7 @@ var room_data =
       "rarity":5
    },
    {
+      "min": 5,
       "name":"mini_reactor",
       "rarity":100
    },
@@ -73,9 +74,10 @@ var room_data =
       "rarity":10
    },
    {
-      "max":1,
+      "min":1,
+      "max":3,
       "name":"kitchen",
-      "rarity":10
+      "rarity":50
    },
    {
       "max":1,
@@ -94,10 +96,10 @@ var room_data =
       "rarity":20
    },
    {
-      "max":1,
+      "max":2,
       "min":1,
       "name":"large_reactor",
-      "rarity":100
+      "rarity":20
    },
    {
       "max":2,
@@ -111,8 +113,8 @@ var room_data =
       "rarity":10
    },
    {
-      "min":2,
-      "max":5,
+      "min":3,
+      "max":6,
       "name":"life_support",
       "rarity":100
    },
