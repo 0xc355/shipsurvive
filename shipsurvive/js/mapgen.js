@@ -16,31 +16,42 @@ containers = {};
 
 /* core functions */
 var core = {
-	load_image: function(name) {
+	load_image: function(name, sprite_only) {
 		if (!globals.images[name]) {
-			var img = new Image();
-			img.src = "img/icon/" + name + ".png";
-			img.onload = function () {
-				globals.images[name] = img;
-			};
-			var spr = new Image();
-			spr.src = "img/sprite/" + name + ".png";
-			spr.onload = function () {
-				globals.images["g_" + name] = spr;
-			};
+			if (sprite_only != true) {
+				var img = new Image();
+				img.src = "img/icon/" + name + ".png";
+				img.onload = function () {
+					globals.images[name] = img;
+				};
+			}
+			if (sprite_only != false) {
+				var spr = new Image();
+				spr.src = "img/sprite/" + name + ".png";
+				spr.onload = function () {
+					globals.images["g_" + name] = spr;
+				};
+			}
 		}
 	},
 	load_images: function() {
 		core.load_image("food");
-		core.load_image("fire");
-		core.load_image("welder_fire");
+		core.load_image("fire", true);
+		core.load_image("welder_fire", true);
 		core.load_image("medipack");
 		core.load_image("wire");
-		core.load_image("wire_cutter");
+		core.load_image("wire_cutter", false);
 		core.load_image("oxygen_tank");
 		core.load_image("empty_tank");
-		core.load_image("welder");
-		core.load_image("breach");
+		core.load_image("welder", false);
+		core.load_image("breach", true);
+		core.load_image("kitchen", true);
+		core.load_image("rubble", true);
+		core.load_image("reactor", true);
+		core.load_image("terminal", true);
+		core.load_image("food_generator", true);
+		core.load_image("life_support", true);
+		core.load_image("medical_bay", true);
 	},
 	load_classes: function() {
 		core.Cell = new JS.Class({
@@ -120,7 +131,7 @@ var core = {
 				this.origin = {x:x, y:y};
 				this.facing = 0;
 				this.type = type;
-				this.cell = undefined;
+				this.cell = mapg.cell_at(x,y);
 			},
 			update_cell: function() {
 				var x = Math.floor((this.origin.x)/defaults.grid_width);
@@ -159,9 +170,17 @@ var core = {
 				return undefined;
 			}
 		});
+		core.Building = new JS.Class(core.Actor, {
+			initialize: function (type, x, y) {
+				this.callSuper(type, x, y);
+			},
+			update_function: function (dt) {
+				//do nothing
+			}
+		});
 		core.Hostile = new JS.Class(core.Actor, {
-			initialize: function () {
-				this.callSuper();
+			initialize: function (type, x, y) {
+				this.callSuper(type, x, y);
 				this.reset_speed();
 				this.max_health = 2;
 				this.health = this.max_health;
@@ -247,9 +266,11 @@ var core = {
 		globals.mousePos = {"x":0, "y":0};
 		globals.room_types = {};
 		globals.pause = false;
+		globals.map_grid = [];
 		globals.objs = [];
 		globals.fires = [];
 		globals.item_map = [];
+		globals.building_map = [];
 		globals.diffuse_counter = 0;
 		globals.inventory = [
 			{type:"wire_cutter", amount:1},
@@ -270,7 +291,7 @@ var core = {
 		core.generate_map();
 		var hostile;
 		for (var i = 0; i < 2; i++) {
-			hostile = core.add_object("hostile");
+			hostile = core.add_hostile("hostile");
 			hostile.random_room();
 		}
 		globals.character = new core.Actor("player", 0, 0);
@@ -293,7 +314,6 @@ var core = {
 			return mapg.cell_at(globals.character.cell.x + dx,
 					    globals.character.cell.y + dy);
 		};
-		globals.character.random_room();
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
 		globals.character.max_oxygen = 5;
@@ -312,7 +332,9 @@ var core = {
 			} else {
 				rooms.default_function(room);
 			}
+			rooms.all_function(room);
 		});
+		globals.character.random_room();
 	},
 	init: function() {
 		core.load_classes();
@@ -346,7 +368,7 @@ var core = {
 		$("#size_slider").slider({max:360, min:0, step:1, value:globals.light_cone, slide:core.change_size});
 		$("#noise_slider").slider({max:100, min:0, step:1, value:5, slide:core.change_noise});
 		$("p#size_display").text("Light Size: " + globals.light_cone);
-		$("p#noise_display").text("Oxygen level: " + globals.base_oxygen_level);
+		$("p#noise_display").text("Oxygen level: " + defaults.base_oxygen_level);
 
 		var ratio = core.hiDPIRatio();
 		if (ratio != 1) {
@@ -361,7 +383,7 @@ var core = {
 		}
 		globals.context.font = defaults.font;
 		cv.addEventListener('click', core.toggle_door, true);
-		cv.addEventListener('contextmenu', core.pause, true);
+		cv.addEventListener('contextmenu', core.toggle_wire, true);
 		cv.addEventListener('mousedown', core.mouse_down, true);
 		cv.addEventListener('mouseup', core.mouse_up, true);
 		cv.addEventListener('keydown', core.keydown_handler, true);
@@ -406,8 +428,21 @@ var core = {
 			core.redraw_map();
 	    	})();
 	},
-	add_object: function(type) {
-		var new_obj = new core.Hostile(type);
+	add_hostile: function(type) {
+		var new_obj = new core.Hostile(type,0,0);
+		globals.objs.push(new_obj);
+		return new_obj;
+	},
+	remove_building: function(building) {
+		globals.objs.splice(globals.objs.indexOf(building), 1);
+		delete globals.building_map[mapg.indexof(building.cell.x, building.cell.y)];
+	},
+	add_building: function(type, x, y) {
+		var new_obj = new core.Building(type,x,y);
+		if (buildings[new_obj.type]) {
+			new_obj.update_function = buildings[new_obj.type](new_obj);
+		}
+		globals.building_map[mapg.indexof(x,y)] = new_obj;
 		globals.objs.push(new_obj);
 		return new_obj;
 	},
@@ -539,6 +574,7 @@ var core = {
 		var wires = [];
 		var breaches = [];
 		var fires = [];;
+		var hostiles = [], buildings = [];
 
 		var screen_end = {
 			x:globals.screen_bounds.origin.x + globals.screen_bounds.size.width,
@@ -549,6 +585,15 @@ var core = {
 		view_bounds.end = core.screen_to_grid_index(screen_end);
 		view_bounds.end.x += 1;
 		view_bounds.end.y += 1;
+
+		for (var i = 0; i < globals.objs.length; i++) {
+			var obj = globals.objs[i];
+			if (!obj.cell.occluded)
+				if (obj.type == "hostile")
+					hostiles.push(obj);
+				else
+					buildings.push(obj);
+		}
 
 		var angle = Math.atan2(1,0);
 		var light_max_dist = (globals.light_cone / 360) * Math.PI;
@@ -617,15 +662,12 @@ var core = {
 		draw_functions.draw_cells(globals.context, closed_door_cells, defaults.grid_width, "rgba(180,0,0,1)");
 		draw_functions.draw_cells(globals.context, open_door_cells, defaults.grid_width, "rgba(0,200,0,1)");
 		draw_functions.draw_items(globals.context, breaches, defaults.grid_width);
+		draw_functions.draw_objects(globals.context, buildings, defaults.grid_width);
 		draw_functions.draw_wires(globals.context, wires, defaults.grid_width, "rgba(255,100,100,1)");
 		draw_functions.draw_items(globals.context, items, defaults.grid_width);
 		draw_functions.draw_fires(globals.context, fires, defaults.grid_width);
 		draw_functions.draw_character(globals.context, globals.character);
-		for (var i = 0; i < globals.objs.length; i++) {
-			var obj = globals.objs[i];
-			if (!obj.cell.occluded)
-				draw_functions.draw_character(globals.context, obj, 10, "#FF0000");
-		}
+		hostiles.forEach(function (h) {draw_functions.draw_character(globals.context, h, 10, "#FF0000")});
 		draw_functions.draw_cells(globals.context, non_occluded_cells, defaults.grid_width, "rgba(255,0,0,1)", 0,
 					  function (cell) {
 						  var gcell = mapg.cell_at(cell.x, cell.y);
@@ -814,7 +856,98 @@ var core = {
 	}
 };
 
+var buildings = {
+	rubble: function(building) {
+		building.power = -10;
+		var hp = 3;
+		building.cell.passable = false;
+		return function (dt) {
+			if (globals.character.welder) {
+				var pos = globals.character.get_welder_flame();
+				if (pos.x == building.cell.x && pos.y == building.cell.y) {
+					hp -= dt;
+				}
+				if (hp <= 0) {
+					core.remove_building(building);
+					building.cell.passable = true;
+				}
+			}
+		};
+	},
+	terminal: function(building) {
+		building.power = -25;
+		return function (dt) {
+			building.cell.room.powered = building.cell.powered;
+		};
+	},
+	life_support: function(building) {
+		building.power = -10;
+		return function (dt) {
+			var cell = building.cell;
+			var powered = cell.powered;
+			var multiplier = powered ? 10 : 3;
+			cell.oxygen = Math.min(cell.oxygen + dt * multiplier/3, 5 * multiplier);
+		};
+	},
+	spawn_function: function(building, timer, type) {
+		var time = 0;
+		return function (dt) {
+			var cell = building.cell;
+			var powered_multiplier = cell.powered ? 1: 0;
+			time += powered_multiplier * dt;
+			if (time > timer) {
+				time = 0;
+				var neighbors = building.cell.grid_neighbors(function (n) {
+					return n && n.passable;
+				});
+				var neighbor = neighbors[utilities.random_interval(0, neighbors.length)];
+				if (mapg.nothing_at(neighbor.x, neighbor.y)) {
+					globals.item_map[mapg.indexof(neighbor.x, neighbor.y)] = {type:type, amount:1};
+				}
+			}
+		}
+	},
+	kitchen: function(building) {
+		building.power = -50;
+		return buildings.spawn_function(building, 5, "food");
+	},
+	food_generator: function(building) {
+		building.power = -25;
+		return buildings.spawn_function(building, 15, "food");
+	},
+	medical_bay: function(building) {
+		building.power = -50;
+		var sp = buildings.spawn_function(building, 10, "medipack");
+		return function (dt) {
+			sp(dt);
+			if (building.cell.powered &&
+					mapg.m_dist(globals.character.cell, building.cell) < 2) {
+				globals.character.health = Math.min(globals.character.max_health,
+								globals.character.health + dt * 3);
+			}
+		}
+	},
+	reactor: function(building) {
+		building.power = 100;
+		return function (dt) {};
+	}
+};
 var rooms = {
+	add_building: function(room, building, min, max) {
+		var number = utilities.random_interval(min, max + 1);
+		var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
+		var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
+		var count = 10;
+		for (var i = 0; i < number; i++ ) {
+			while (globals.building_map[mapg.indexof(x,y)]) {
+				x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
+				y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
+				count -= 1;
+				if (count == 0) {return;} 
+			}
+			core.add_building(building,x,y);
+		}
+	},
 	freezer: function (room) {
 		return function (dt) {
 			if (room.powered) {
@@ -825,23 +958,20 @@ var rooms = {
 		};
 	},
 	kitchen: function (room) {
-		var time = 0;
 		room.heat = .2;
-		return function (dt) {
-			var powered_multiplier = room.powered ? 1: 0;
-			time += powered_multiplier * dt;
-			if (time > 5) {
-				time = 0;
-				var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
-				var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
-				if (!globals.item_map[mapg.indexof(x,y)]) {
-					globals.item_map[mapg.indexof(x,y)] = {type:"food", amount:1};
-				}
-			}
-		}
+		rooms.add_building(room, "kitchen", 1, 1);
+		rooms.add_building(room, "food_generator", 1, 3);
+
+	},
+	mini_reactor: function (room) {
+		rooms.add_building(room, "reactor", 3, 5);
+	},
+	large_reactor: function (room) {
+		rooms.add_building(room, "reactor", 5, 10);
 	},
 	medical_bay: function (room) {
 		var time = 0;
+		rooms.add_building(room, "medical_bay", 1, 2);
 		return function (dt) {
 			var powered_multiplier = room.powered ? 1: 0;
 			time += powered_multiplier * dt;
@@ -852,10 +982,6 @@ var rooms = {
 				if (!globals.item_map[mapg.indexof(x,y)]) {
 					globals.item_map[mapg.indexof(x,y)] = {type:"medipack", amount:1};
 				}
-			}
-			if (globals.character.cell.room == room) {
-				globals.character.health = Math.min(globals.character.max_health,
-								globals.character.health + dt * 3);
 			}
 		}
 	},
@@ -872,15 +998,7 @@ var rooms = {
 		}
 	},
 	life_support: function (room) {
-		return function (dt) {
-			var multiplier = room.powered ? 10 : 3;
-			for (var x = room.origin.x; x < room.origin.x + room.dimensions.width; x+= 4) {
-				for (var y = room.origin.y; y < room.origin.y + room.dimensions.height; y+= 4) {
-					var cell = mapg.cell_at(x,y);
-					cell.oxygen = Math.min(cell.oxygen + dt * multiplier/3, 5 * multiplier);
-				}
-			}
-		};
+		rooms.add_building(room, "life_support", 3, 5);
 	},
 	default_function: function (room) {
 		var add_item = function (type, amount) {
@@ -902,9 +1020,12 @@ var rooms = {
 		while(Math.random() < .2) {
 			add_item("empty_tank",1);
 		}
-		while(Math.random() < .2) {
-			add_item("welder",1);
+	},
+	all_function: function (room) {
+		if (Math.random() < .4) {
+			rooms.add_building(room, "rubble", 8, 20);
 		}
+		rooms.add_building(room, "terminal", 1, 1);
 	}
 };
 var items = {
@@ -982,6 +1103,7 @@ var items = {
 		if (next_cell && next_cell.passable && distance < 2.5) {
 			if (next_cell.wired) {
 				next_cell.wired =  false;
+				next_cell.powered = false;
 				delete globals.wires[next_cell.hash_cell()];
 				mapg.recalculate_power();
 				globals.inventory.add_item("wire", 1);
@@ -1087,6 +1209,10 @@ var utilities = {
 }
 
 var mapg = {
+	nothing_at: function(x, y) {
+		return !globals.item_map[mapg.indexof(x,y)] && !globals.building_map[mapg.indexof(x,y)] &&
+			!(globals.character.cell.x == x && globals.character.cell.y == y);
+	},
 	hash_room: function(room) {
 		if (room) {
 			return room.origin.x + ", " + room.origin.y;
@@ -1336,25 +1462,23 @@ var mapg = {
 		return wiresets;
 	},
 	recalculate_power: function() {
+		_.values(globals.wires).forEach(function (n) {return n.powered = false});
 		var wiresets = mapg.collect_wiresets();
 		globals.rooms.forEach(function (room) {room.powered = room.power_src > 0;});
 		wiresets.forEach(function (wireset) {
 			var room_set = new JS.Set();
-			for (var i = 0; i < wireset.length; i++) {
-				var wire = wireset[i];
-				if (wire.room) {room_set.add(wire.room)};
-			}
 			var power_available = 0;
 			var power_drain = 0;
-			room_set.entries().forEach(function (room) {
-				if (room.power_src > 0) {
-					power_available += room.power_src;
+			for (var i = 0; i < wireset.length; i++) {
+				var wire = wireset[i];
+				var building = globals.building_map[mapg.indexof(wire.x, wire.y)];
+				if (building) {
+					power_available += building.power;
 				} else {
-					power_drain += room.dimensions.width
-							* room.dimensions.height;
+					power_available -= 1;
 				}
-			});
-			var enough_power = power_drain < power_available;
+			}
+			var enough_power = power_available > 0;
 			room_set.entries().forEach(function (room) {
 				if (room.power_src <= 0) {
 					room.powered |= enough_power;
@@ -1371,6 +1495,7 @@ var mapg = {
 		var rooms = [];
 		var types_added = {};
 		var tWeight = 0;
+		var map_grid = globals.map_grid;
 		globals.kitchens = [];
 		utilities.shuffle_array(globals.room_data);
 		//first fill the graph with minimal rooms
@@ -1406,7 +1531,6 @@ var mapg = {
 		}
 		utilities.shuffle_array(rooms);
 		
-		var map_grid = [];
 		
 		var rotate_room = function (room, n) {
 			var r_room = {"origin":{}, "dimensions":{}};
@@ -1662,7 +1786,6 @@ var mapg = {
 			}
 			add_walls(room, map_grid, globals.walls);
 			globals.open_cells = open_set;
-			globals.map_grid = map_grid;
 			globals.rooms = rooms;
 			i += 1;
 			return room;
@@ -1708,6 +1831,22 @@ var draw_functions = {
 			var width =  cell_width;
 			var height = cell_width;
 				var img = globals.images["g_fire"];
+			if (img) {
+				ctx.drawImage(img, startX, startY);
+			}
+		}
+	},
+	draw_objects: function(ctx, objs, cell_width) {
+		var line_width =  2;
+		ctx.fillStyle = "#BBBB00";
+		for (var i = 0; i < objs.length; i++) {
+			var obj = objs[i];
+			var cell = obj.cell;
+			var startX = cell.x * cell_width - globals.character.origin.x + globals.centroid.x;
+			var startY = cell.y * cell_width - globals.character.origin.y + globals.centroid.y;
+			var width =  cell_width;
+			var height = cell_width;
+			var img = globals.images["g_" + obj.type];
 			if (img) {
 				ctx.drawImage(img, startX, startY);
 			}
