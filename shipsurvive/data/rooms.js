@@ -86,6 +86,18 @@ var room_data =
       "rarity":100
    },
    {
+      "max":2,
+      "min":2,
+      "name":"engines",
+      "rarity":100
+   },
+   {
+      "max":1,
+      "min":1,
+      "name":"bridge",
+      "rarity":100
+   },
+   {
       "max":1,
       "name":"shielding",
       "rarity":10

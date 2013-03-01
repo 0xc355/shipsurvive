@@ -52,6 +52,8 @@ var core = {
 		core.load_image("small_salvage", true);
 		core.load_image("medium_salvage", true);
 		core.load_image("large_salvage", true);
+		core.load_image("engine", true);
+		core.load_image("autopilot", true);
 		core.load_image("replicator", true);
 		core.load_image("terminal", true);
 		core.load_image("food_generator", true);
@@ -284,6 +286,9 @@ var core = {
 		globals.fires = [];
 		globals.item_map = [];
 		globals.building_map = [];
+		globals.max_distance = 3000;
+		globals.distance = globals.max_distance;
+		globals.on_course = false;
 		globals.diffuse_counter = 0;
 		globals.inventory = [
 			{type:"wire_cutter", amount:1},
@@ -716,6 +721,9 @@ var core = {
 		draw_functions.draw_heatbar(globals.context,
 					globals.character.temperature/globals.character.max_temperature,
 					{x:globals.screen_bounds.size.width - 35, y:30}, 2);
+		draw_functions.draw_distance_bar(globals.context,
+					globals.distance/globals.max_distance,
+					globals.screen_bounds.size.height - 22, 2);
 		draw_functions.draw_healthbar(globals.context, "#00AA00",
 					globals.character.hunger/globals.character.max_hunger,
 					{x:globals.screen_bounds.size.width - 50, y:30});
@@ -882,6 +890,22 @@ var core = {
 var buildings = {
 	rubble: function(building) {
 		return buildings.generic_salvage(building, 3, 1, 1);
+	},
+	autopilot: function(building) {
+		building.power = -100;
+		return function (dt) {
+			globals.on_course = !!building.cell.powered;
+		};
+	},
+	engine: function(building) {
+		building.power = -200;
+		return function (dt) {
+			globals.distance -= globals.on_course * building.cell.powered * dt;
+			if (globals.distance <= 0) {
+				console.log("WIN");
+				core.reset();
+			}
+		};
 	},
 	generic_salvage: function(building, hp, min, max, passable) {
 		building.power = -1;
@@ -1053,6 +1077,14 @@ var rooms = {
 		rooms.add_building(room, "food_generator", 1, 3);
 		rooms.add_salvage(room, -3, 6);
 	},
+	engines: function (room) {
+		rooms.add_building(room, "engine", 1, 1);
+		rooms.default_function(room);
+	},
+	bridge: function (room) {
+		rooms.add_building(room, "autopilot", 1, 1);
+		rooms.default_function(room);
+	},
 	mini_reactor: function (room) {
 		rooms.add_building(room, "reactor", 3, 5);
 		rooms.add_salvage(room, -1, 2);
@@ -1151,17 +1183,6 @@ var items = {
 		return 0;
 	},
 	welder: function(item) {
-		/*var grid_point = core.screen_to_grid_index(globals.mousePos);
-		var next_cell = core.check_position(grid_point.x, grid_point.y);
-		var dx = next_cell.x - globals.current_cell.x;
-		var dy = next_cell.y - globals.current_cell.y;
-		var distance = Math.sqrt(dx*dx + dy*dy);
-		if (next_cell && next_cell.passable && distance < 2.5) {
-			if (next_cell.breach > 0) {
-				next_cell.breach = Math.max(0, next_cell.breach - 1);
-				return 1;
-			}
-		}*/
 		item.in_use = !item.in_use;
 		if (item.in_use) {
 			console.log("welder on");
@@ -1916,6 +1937,14 @@ var draw_functions = {
 		ctx.fillStyle = color;
 		ctx.fillRect(offset.x, offset.y, 10, 200 * percent);
 	},
+	draw_distance_bar: function(ctx, percent, offset, width) {
+		var cv = globals.canvas[0];
+		var sw = globals.screen_bounds.size.width;
+		ctx.fillStyle = "#663355";
+		ctx.fillRect(20, offset, sw - 40, 10);
+		ctx.fillStyle = "white";
+		ctx.fillRect(20 + (1 - percent) * sw - width/2, offset, width, 10);
+	},
 	draw_heatbar: function(ctx, percent, offset, width) {
 		var cv = globals.canvas[0];
 		var grad = ctx.createLinearGradient(0,0,0,200);
@@ -1976,7 +2005,7 @@ var draw_functions = {
 	},
 	draw_inventory: function(ctx, items, width) {
 		var i = 0;
-		var offset = {x: 10, y:globals.screen_bounds.size.height - 10 - width};
+		var offset = {x: 10, y:globals.screen_bounds.size.height - 30 - width};
 		ctx.fillStyle = "#00BB00";
 		items.forEach(function (item) {
 			if (item.in_use) {
