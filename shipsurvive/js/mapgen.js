@@ -285,6 +285,7 @@ var core = {
 		globals.objs = [];
 		globals.fires = [];
 		globals.item_map = [];
+		globals.wiresets = [];
 		globals.building_map = [];
 		globals.max_distance = 3000;
 		globals.distance = globals.max_distance;
@@ -529,8 +530,8 @@ var core = {
 			if (next_cell.wired && globals.keys.shift) {
 				next_cell.wired = false;
 				next_cell.powered = false;
-				next_cell.power_available = 0;
 				next_cell.power_load = 0;
+				next_cell.power_source = 0;
 				delete globals.wires[next_cell.hash_cell()];
 			} else if (!next_cell.wired &&  !globals.keys.shift){
 				next_cell.wired =  true;
@@ -1157,6 +1158,8 @@ var rooms = {
 		rooms.add_salvage(room, -3, 5);
 	},
 	all_function: function (room) {
+		rooms.add_building(room, "life_support", 4, 4);
+		rooms.add_building(room, "reactor", 4, 4);
 		if (Math.random() < .4) {
 			rooms.add_building(room, "rubble", 8, 20);
 		}
@@ -1231,8 +1234,8 @@ var items = {
 			if (next_cell.wired) {
 				next_cell.wired =  false;
 				next_cell.powered = false;
-				next_cell.power_available = 0;
 				next_cell.power_load = 0;
+				next_cell.power_source = 0;
 				delete globals.wires[next_cell.hash_cell()];
 				mapg.recalculate_power();
 				globals.inventory.add_item("wire", 1);
@@ -1504,7 +1507,8 @@ var mapg = {
 		if (cell.wired) {
 			cell.wired =  false;
 			cell.powered = false;
-			cell.power_available = 0;
+			cell.power_load = 0;
+			cell.power_source = 0;
 			cell.power_load = 0;
 			delete globals.wires[cell.hash_cell()];
 			mapg.recalculate_power();
@@ -1533,8 +1537,8 @@ var mapg = {
 						if (cell.wired) {
 							cell.wired =  false;
 							cell.powered = false;
-							cell.power_available = 0;
 							cell.power_load = 0;
+							cell.power_source = 0;
 							delete globals.wires[cell.hash_cell()];
 							mapg.recalculate_power();
 						}
@@ -1550,8 +1554,11 @@ var mapg = {
 		globals.fires = globals.fires.concat(new_flames);
 	},
 	check_for_short: function() {
-		_.values(globals.wires).forEach(function (n) {
-			var possibility = n.power_load / 10000;
+		globals.wiresets.forEach(function (set) {
+			var n = set[utilities.random_interval(0,set.length)];
+			var extra_power = n.power_source - n.power_load;
+			var possibility = (n.power_load - extra_power) / 10000;
+			console.log(possibility);
 			if (n.powered && Math.random() < possibility) {
 				mapg.add_fire(n);
 			}
@@ -1618,15 +1625,17 @@ var mapg = {
 	recalculate_power: function() {
 		_.values(globals.wires).forEach(function (n) {
 			n.powered = false;
-			n.power_available = 0;
 			n.power_load = 0;
+			n.power_source = 0;
 		});
 		var wiresets = mapg.collect_wiresets();
+		globals.wiresets = wiresets;
 		globals.rooms.forEach(function (room) {room.powered = room.power_src > 0;});
 		wiresets.forEach(function (wireset) {
 			var room_set = new JS.Set();
 			var power_available = 0;
 			var power_load = 0;
+			var power_source = 0;
 			for (var i = 0; i < wireset.length; i++) {
 				var wire = wireset[i];
 				var building = globals.building_map[mapg.indexof(wire.x, wire.y)];
@@ -1634,6 +1643,9 @@ var mapg = {
 					power_available += building.power;
 					if (building.power < 0) {
 						power_load -= building.power;
+					} else {
+						power_source += building.power;
+						console.log(power_source);
 					}
 				} else {
 					power_available -= 1;
@@ -1641,7 +1653,6 @@ var mapg = {
 				}
 			}
 			var enough_power = power_available > 0;
-			console.log(power_available);
 			room_set.entries().forEach(function (room) {
 				if (room.power_src <= 0) {
 					room.powered |= enough_power;
@@ -1651,8 +1662,9 @@ var mapg = {
 			});
 			wireset.forEach(function (wire) {
 				wire.powered = enough_power;
-				wire.power_available = power_available;
 				wire.power_load = power_load;
+				wire.power_source = power_source;
+				console.log(power_source);
 			});
 		});
 	},
@@ -2210,15 +2222,19 @@ var draw_functions = {
 			return;
 		}
 		var oxygen_string = "oxygen: " + Math.round(globals.character.cell.oxygen * 100) / 100;
-		var power_string = globals.character.cell.wired ? "power: " + globals.character.cell.power_available : ""; 
+		var power_source = globals.character.cell.wired ?
+			"power source: " + globals.character.cell.power_source : ""; 
+		var power_load = globals.character.cell.wired ?
+			"power load: " + globals.character.cell.power_load : ""; 
 		var text = (room.name || room.type) + " " + oxygen_string;
 
 		var startX = start.x + offset.x;
 		var startY = start.y + offset.y;
 		var name_str = text.replace("_"," ");
 		var lines = getLines(ctx, name_str, 200);
-		if (power_string != "") {
-			lines.push(power_string);
+		if (power_source != "") {
+			lines.push(power_source);
+			lines.push(power_load);
 		}
 		var lineHeight = 14;
 		var maxH = lines.length * lineHeight;
