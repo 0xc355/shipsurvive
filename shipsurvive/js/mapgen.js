@@ -241,7 +241,8 @@ var core = {
 						}
 					}
 				}
-				if (this.cell == globals.character.get_welder_flame()) {
+				if (globals.character.welder
+				    && this.cell == globals.character.get_welder_flame()) {
 					this.health -= dt;
 					if (this.health < 0) {
 						this.health = this.max_health;
@@ -286,7 +287,8 @@ var core = {
 		globals.inventory = [
 			{type:"wire_cutter", amount:1},
 			{type:"welder", amount:1},
-			{type:"medipack", amount: 5}
+			{type:"wire", amount: 20},
+			{type:"oxygen_tank", amount: 2}
 		];
 		globals.inventory.add_item = function (type, amount) {
 			var item = _.find(this, function (item) {
@@ -702,7 +704,7 @@ var core = {
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
-		draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-10},
+		draw_functions.draw_score(globals.context, {"x":globals.screen_bounds.size.width- 130, "y":5},
 						globals.character.scraps);
 		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/globals.character.max_health,
 					      {x:globals.screen_bounds.size.width - 20, y:30});
@@ -2098,7 +2100,7 @@ var draw_functions = {
 	},
 	draw_score: function(ctx, offset, score) {
 		ctx.font = "bold 20px " + defaults.font;
-		ctx.textBaseline = "bottom";
+		ctx.textBaseline = "top";
 		ctx.fillStyle = "#DD0000";
 		ctx.fillText("Scraps: " + Math.round(score), offset.x, offset.y);
 	},
