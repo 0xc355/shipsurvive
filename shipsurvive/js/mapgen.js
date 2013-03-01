@@ -873,7 +873,7 @@ var core = {
 
 var buildings = {
 	rubble: function(building) {
-		return buildings.buildings.generic_salvage(building, 3, 1, 1);
+		return buildings.generic_salvage(building, 3, 1, 1);
 	},
 	generic_salvage: function(building, hp, min, max, passable) {
 		building.power = -1;
@@ -995,7 +995,7 @@ var buildings = {
 };
 var rooms = {
 	add_salvage: function(room, min, max) {
-		var types = {};
+		var types = {small:0, medium:0, large:0};
 		var number = utilities.random_interval(min, max+1);
 		if (number <= 0) {return;}
 		for (var i = min; i < max + 1; i++) {
@@ -1111,7 +1111,7 @@ var rooms = {
 	},
 	all_function: function (room) {
 		if (Math.random() < .4) {
-			rooms.add_building(room, "small_salvage", 8, 20);
+			rooms.add_building(room, "rubble", 8, 20);
 		}
 		rooms.add_building(room, "terminal", 1, 1);
 		if (Math.random() < .2) {
