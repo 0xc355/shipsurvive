@@ -290,6 +290,7 @@ var core = {
 		globals.distance = globals.max_distance;
 		globals.on_course = false;
 		globals.diffuse_counter = 0;
+		globals.flame_counter = 0;
 		globals.inventory = [
 			{type:"wire_cutter", amount:1},
 			{type:"welder", amount:1},
@@ -529,6 +530,7 @@ var core = {
 				next_cell.wired = false;
 				next_cell.powered = false;
 				next_cell.power_available = 0;
+				next_cell.power_load = 0;
 				delete globals.wires[next_cell.hash_cell()];
 			} else if (!next_cell.wired &&  !globals.keys.shift){
 				next_cell.wired =  true;
@@ -762,9 +764,14 @@ var core = {
 		var moved = false;
 		var original_cell = globals.character.cell;
 		globals.diffuse_counter += dt;
+		globals.flame_counter += dt;
 		if (globals.diffuse_counter > 1) {
 			mapg.diffuse_oxygen();
 			globals.diffuse_counter = 0;
+		}
+		if (globals.flame_counter > 1) {
+			mapg.check_for_short();
+			globals.flame_counter = 0;
 		}
 		mapg.propagate_flames(dt);
 		if (globals.keys.w) { dd.y -= dt * 100; }
@@ -1225,6 +1232,7 @@ var items = {
 				next_cell.wired =  false;
 				next_cell.powered = false;
 				next_cell.power_available = 0;
+				next_cell.power_load = 0;
 				delete globals.wires[next_cell.hash_cell()];
 				mapg.recalculate_power();
 				globals.inventory.add_item("wire", 1);
@@ -1493,6 +1501,14 @@ var mapg = {
 		var new_fire = {cell:cell, spread:0};
 		globals.fires.push(new_fire);
 		cell.fire = new_fire;
+		if (cell.wired) {
+			cell.wired =  false;
+			cell.powered = false;
+			cell.power_available = 0;
+			cell.power_load = 0;
+			delete globals.wires[cell.hash_cell()];
+			mapg.recalculate_power();
+		}
 	},
 	propagate_flames: function(dt) {
 		var dead_flames = [];
@@ -1507,13 +1523,21 @@ var mapg = {
 				if (flame.spread > 2) {
 					flame.spread = 0;
 					var others = flame.cell.grid_neighbors(function (cell) {
-						return cell && cell.passable && !cell.fire && cell.oxygen > 2;});
+						return cell && cell.passable && !cell.fire && cell.oxygen > .5;});
 					if (others.length > 0) {
 						var s_index = utilities.random_interval(0,others.length);
-						var spreaded = others[s_index];
-						var new_fire = {cell:spreaded, spread:0};
+						var cell = others[s_index];
+						var new_fire = {cell:cell, spread:0};
 						new_flames.push(new_fire);
-						spreaded.fire = new_fire;
+						cell.fire = new_fire;
+						if (cell.wired) {
+							cell.wired =  false;
+							cell.powered = false;
+							cell.power_available = 0;
+							cell.power_load = 0;
+							delete globals.wires[cell.hash_cell()];
+							mapg.recalculate_power();
+						}
 					}
 				}
 			}
@@ -1524,6 +1548,14 @@ var mapg = {
 		if (dead_flames.length > 0)
 		console.log(globals.fires);
 		globals.fires = globals.fires.concat(new_flames);
+	},
+	check_for_short: function() {
+		_.values(globals.wires).forEach(function (n) {
+			var possibility = n.power_load / 10000;
+			if (n.powered && Math.random() < possibility) {
+				mapg.add_fire(n);
+			}
+		});
 	},
 	diffuse_oxygen: function() {
 		for (var y = 1; y < globals.bounds.height - 1; y++) {
@@ -1587,20 +1619,25 @@ var mapg = {
 		_.values(globals.wires).forEach(function (n) {
 			n.powered = false;
 			n.power_available = 0;
+			n.power_load = 0;
 		});
 		var wiresets = mapg.collect_wiresets();
 		globals.rooms.forEach(function (room) {room.powered = room.power_src > 0;});
 		wiresets.forEach(function (wireset) {
 			var room_set = new JS.Set();
 			var power_available = 0;
-			var power_drain = 0;
+			var power_load = 0;
 			for (var i = 0; i < wireset.length; i++) {
 				var wire = wireset[i];
 				var building = globals.building_map[mapg.indexof(wire.x, wire.y)];
 				if (building) {
 					power_available += building.power;
+					if (building.power < 0) {
+						power_load -= building.power;
+					}
 				} else {
 					power_available -= 1;
+					power_load += 1;
 				}
 			}
 			var enough_power = power_available > 0;
@@ -1615,6 +1652,7 @@ var mapg = {
 			wireset.forEach(function (wire) {
 				wire.powered = enough_power;
 				wire.power_available = power_available;
+				wire.power_load = power_load;
 			});
 		});
 	},
