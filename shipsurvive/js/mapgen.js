@@ -38,6 +38,7 @@ var core = {
 		core.load_image("food");
 		core.load_image("fire", true);
 		core.load_image("welder_fire", true);
+		core.load_image("welder_fire_small", true);
 		core.load_image("medipack");
 		core.load_image("wire");
 		core.load_image("wire_cutter", false);
@@ -301,6 +302,7 @@ var core = {
 			}
 		};
 		globals.score = 0;
+		globals.timer = 0;
 		core.generate_map();
 		var hostile;
 		for (var i = 0; i < 2; i++) {
@@ -612,7 +614,8 @@ var core = {
 		}
 
 		var angle = Math.atan2(1,0);
-		var light_max_dist = (globals.light_cone / 360) * Math.PI;
+		var light_angle = globals.light_cone * (globals.character.welder ? 3 : 1);
+		var light_max_dist = (light_angle / 360) * Math.PI;
 		for (var y = view_bounds.origin.y; y < view_bounds.end.y; y++) {
 			for (var x = view_bounds.origin.x; x < view_bounds.end.x; x++) {
 				var cell = globals.map_grid[mapg.indexof(x,y)];
@@ -693,8 +696,10 @@ var core = {
 					  }, "255,0,0");
 		if (globals.character.welder > 0) {
 			var welder_flame_pos = globals.character.get_welder_flame();
+			var frame = Math.round(globals.timer * 10) % 2;
 			if (welder_flame_pos && welder_flame_pos.type != "wall") {
-				draw_functions.draw_items(globals.context, [{item:{type:"welder_fire"},
+				draw_functions.draw_items(globals.context,
+							  [{item:{type:frame ? "welder_fire" : "welder_fire_small"},
 							  position:welder_flame_pos}], defaults.grid_width);
 			}
 		}
@@ -742,6 +747,7 @@ var core = {
 	},
 	update: function(dt) {
 		if (globals.pause) {return;}
+		globals.timer += dt;
 		globals.score += dt * 10;
 		var new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
 		var dd = {x:0, y:0};
