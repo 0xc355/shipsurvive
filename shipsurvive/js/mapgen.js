@@ -383,7 +383,7 @@ var core = {
 		}
 		globals.context.font = defaults.font;
 		cv.addEventListener('click', core.toggle_door, true);
-		cv.addEventListener('contextmenu', core.toggle_wire, true);
+		cv.addEventListener('contextmenu', core.pause, true);
 		cv.addEventListener('mousedown', core.mouse_down, true);
 		cv.addEventListener('mouseup', core.mouse_up, true);
 		cv.addEventListener('keydown', core.keydown_handler, true);
@@ -804,7 +804,7 @@ var core = {
 					welder_flame_pos.type = "open";
 				}
 			}
-			if (Math.random() < welder_flame_pos.oxygen * dt * .01) {
+			if (Math.random() < welder_flame_pos.oxygen * dt * .0075) {
 				mapg.add_fire(welder_flame_pos);
 			}
 			oxygen_req += dt * 1;
