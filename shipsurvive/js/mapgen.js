@@ -8,8 +8,8 @@ defaults = {
 	grid_width: 20,
 	breach_chance: .02,
 	base_oxygen_level: 5,
-	room_min: 5,
-	room_max: 10,
+	room_min: 6,
+	room_max: 12,
 	font: 'Cutive Mono',
 },
 containers = {};
@@ -48,6 +48,10 @@ var core = {
 		core.load_image("kitchen", true);
 		core.load_image("rubble", true);
 		core.load_image("reactor", true);
+		core.load_image("small_salvage", true);
+		core.load_image("medium_salvage", true);
+		core.load_image("large_salvage", true);
+		core.load_image("replicator", true);
 		core.load_image("terminal", true);
 		core.load_image("food_generator", true);
 		core.load_image("life_support", true);
@@ -153,6 +157,13 @@ var core = {
 				c_origin.y += utilities.random_interval(1, start_room.dimensions.height - 1) * defaults.grid_width;
 				this.origin = c_origin;
 				this.update_cell();
+			},
+			try_move: function(x, y) {
+				var new_origin = {x:this.origin.x+x, y:this.origin.y+y};
+				var x = Math.floor((new_origin.x)/defaults.grid_width);
+				var y = Math.floor((new_origin.y)/defaults.grid_width);
+				var next_room = core.check_position(x,y);
+				return next_room;
 			},
 			move: function(x, y) {
 				var new_origin = {x:this.origin.x+x, y:this.origin.y+y};
@@ -317,11 +328,12 @@ var core = {
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
 		globals.character.max_oxygen = 5;
-		globals.character.max_temperature = 20;
-		globals.character.temperature = 10;
+		globals.character.max_temperature = 40;
+		globals.character.temperature = globals.character.max_temperature/2;
 		globals.character.health = globals.character.max_health;
 		globals.character.hunger = globals.character.max_hunger;
 		globals.character.oxygen = globals.character.max_oxygen;
+		globals.character.scraps = 10;
 		globals.room_func = [];
 		globals.rooms.forEach(function (room) {
 			if (rooms[room.type]) {
@@ -506,6 +518,8 @@ var core = {
 		if (next_cell && next_cell.passable && distance < 2.5) {
 			if (next_cell.wired && globals.keys.shift) {
 				next_cell.wired = false;
+				next_cell.powered = false;
+				next_cell.power_available = 0;
 				delete globals.wires[next_cell.hash_cell()];
 			} else if (!next_cell.wired &&  !globals.keys.shift){
 				next_cell.wired =  true;
@@ -688,8 +702,8 @@ var core = {
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
-		//draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-10},
-		//				globals.score);
+		draw_functions.draw_score(globals.context, {"x":10, "y":globals.screen_bounds.size.height-10},
+						globals.character.scraps);
 		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/globals.character.max_health,
 					      {x:globals.screen_bounds.size.width - 20, y:30});
 		draw_functions.draw_heatbar(globals.context,
@@ -743,6 +757,7 @@ var core = {
 		if (globals.keys.a) { dd.x -= dt * 100; }
 		if (globals.keys.d) { dd.x += dt * 100; }
 		globals.character.move(dd.x, 0) || moved;
+		globals.character.next_cell = globals.character.try_move(dd.x, dd.y);
 		if (!original_cell.equals(globals.character.cell)) {
 			var item = globals.item_map[mapg.indexof(globals.character.cell)];
 			if (item) {
@@ -828,7 +843,7 @@ var core = {
 			temperature -= Math.min(.6, temperature_differential * .1);
 		}
 		globals.character.temperature = Math.min(Math.max(0,
-						globals.character.temperature + (temperature - 1) * dt),
+						globals.character.temperature + (temperature - .5) * dt),
 						m_temp);
 	
 		if (globals.character.temperature < m_temp * .2) {
@@ -858,21 +873,43 @@ var core = {
 
 var buildings = {
 	rubble: function(building) {
-		building.power = -10;
-		var hp = 3;
-		building.cell.passable = false;
+		return buildings.buildings.generic_salvage(building, 3, 1, 1);
+	},
+	generic_salvage: function(building, hp, min, max, passable) {
+		building.power = -1;
+		passable = !!passable;
+		building.cell.passable = passable;
 		return function (dt) {
 			if (globals.character.welder) {
-				var pos = globals.character.get_welder_flame();
-				if (pos.x == building.cell.x && pos.y == building.cell.y) {
-					hp -= dt;
-				}
-				if (hp <= 0) {
-					core.remove_building(building);
+				var flame_pos = globals.character.get_welder_flame();
+				var in_flame = flame_pos.equals(building.cell);
+			} else {
+				var in_flame = false;
+			}
+			if (!passable) {
+				var bump_pos = globals.character.next_cell;
+			} else {
+				var bump_pos = globals.character.cell;
+			}
+			var moving_in = bump_pos.equals(building.cell);
+
+			hp -= dt * (in_flame * 1 + moving_in * .33);
+			if (hp <= 0) {
+				core.remove_building(building);
+				if (!passable)
 					building.cell.passable = true;
-				}
+				globals.character.scraps += utilities.random_interval(min, max+1);
 			}
 		};
+	},
+	small_salvage: function(building) {
+		return buildings.generic_salvage(building, 1, 1, 3, true);
+	},
+	medium_salvage: function(building) {
+		return buildings.generic_salvage(building, 1.5, 3, 7, true);
+	},
+	large_salvage: function(building) {
+		return buildings.generic_salvage(building, 3, 5, 10, true);
 	},
 	terminal: function(building) {
 		building.power = -25;
@@ -902,7 +939,8 @@ var buildings = {
 				});
 				var neighbor = neighbors[utilities.random_interval(0, neighbors.length)];
 				if (mapg.nothing_at(neighbor.x, neighbor.y)) {
-					globals.item_map[mapg.indexof(neighbor.x, neighbor.y)] = {type:type, amount:1};
+					globals.item_map[mapg.indexof(neighbor.x, neighbor.y)] =
+						{type:type, amount:1};
 				}
 			}
 		}
@@ -927,12 +965,55 @@ var buildings = {
 			}
 		}
 	},
+	replicator: function(building) {
+		building.power = -70;
+		var time = 0;
+		var timer = 1;
+		var scrap_req = 1;
+		return function (dt) {
+			var cell = building.cell;
+			var powered_multiplier = cell.powered ? 1: 0;
+			time += powered_multiplier * dt;
+			if (time > timer && globals.character.scraps > scrap_req) {
+				time = 0;
+				var neighbors = building.cell.grid_neighbors(function (n) {
+					return n && n.passable;
+				});
+				var neighbor = neighbors[utilities.random_interval(0, neighbors.length)];
+				if (mapg.nothing_at(neighbor.x, neighbor.y)) {
+					globals.character.scraps -= scrap_req;
+					globals.item_map[mapg.indexof(neighbor.x, neighbor.y)] =
+						{type:"wire", amount:5};
+				}
+			}
+		}
+	},
 	reactor: function(building) {
 		building.power = 50;
 		return function (dt) {};
 	}
 };
 var rooms = {
+	add_salvage: function(room, min, max) {
+		var types = {};
+		var number = utilities.random_interval(min, max+1);
+		if (number <= 0) {return;}
+		for (var i = min; i < max + 1; i++) {
+			var rn = Math.random();
+			if (rn < .1) {
+				types.large += 1;
+			}
+			else if (rn < .35) {
+				types.medium += 1;
+			}
+			else {
+				types.small += 1;
+			}
+		}
+		rooms.add_building(room, "small_salvage", types.small, types.small);
+		rooms.add_building(room, "medium_salvage", types.medium, types.medium);
+		rooms.add_building(room, "large_salvage", types.large, types.large);
+	},
 	add_building: function(room, building, min, max) {
 		var number = utilities.random_interval(min, max + 1);
 		var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
@@ -949,6 +1030,7 @@ var rooms = {
 		}
 	},
 	freezer: function (room) {
+		rooms.add_salvage(room, 5, 15);
 		return function (dt) {
 			if (room.powered) {
 				room.heat = -3;
@@ -961,13 +1043,15 @@ var rooms = {
 		room.heat = .2;
 		rooms.add_building(room, "kitchen", 1, 1);
 		rooms.add_building(room, "food_generator", 1, 3);
-
+		rooms.add_salvage(room, -3, 6);
 	},
 	mini_reactor: function (room) {
 		rooms.add_building(room, "reactor", 3, 5);
+		rooms.add_salvage(room, -1, 2);
 	},
 	large_reactor: function (room) {
 		rooms.add_building(room, "reactor", 5, 10);
+		rooms.add_salvage(room, -1, 4);
 	},
 	medical_bay: function (room) {
 		var time = 0;
@@ -984,21 +1068,24 @@ var rooms = {
 				}
 			}
 		}
+		rooms.add_salvage(room, -2, 2);
 	},
 	cargo: function (room) {
 		var add_food = function () {
 			var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
 			var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
-			if (!globals.item_map[mapg.indexof(x,y)]) {
+			if (mapg.nothing_at(x, y)) {
 				globals.item_map[mapg.indexof(x,y)] = {type:"food", amount:1};
 			}
 		}
+		rooms.add_salvage(room, 4, 6);
 		while(Math.random() > .2) {
 			add_food();
 		}
 	},
 	life_support: function (room) {
 		rooms.add_building(room, "life_support", 3, 5);
+		rooms.add_salvage(room, -3, 2);
 	},
 	default_function: function (room) {
 		var add_item = function (type, amount) {
@@ -1020,12 +1107,16 @@ var rooms = {
 		while(Math.random() < .2) {
 			add_item("empty_tank",1);
 		}
+		rooms.add_salvage(room, -3, 5);
 	},
 	all_function: function (room) {
 		if (Math.random() < .4) {
-			rooms.add_building(room, "rubble", 8, 20);
+			rooms.add_building(room, "small_salvage", 8, 20);
 		}
 		rooms.add_building(room, "terminal", 1, 1);
+		if (Math.random() < .2) {
+			rooms.add_building(room, "replicator", 1, 1);
+		}
 	}
 };
 var items = {
@@ -1104,6 +1195,7 @@ var items = {
 			if (next_cell.wired) {
 				next_cell.wired =  false;
 				next_cell.powered = false;
+				next_cell.power_available = 0;
 				delete globals.wires[next_cell.hash_cell()];
 				mapg.recalculate_power();
 				globals.inventory.add_item("wire", 1);
@@ -1210,8 +1302,9 @@ var utilities = {
 
 var mapg = {
 	nothing_at: function(x, y) {
+		var char_at = globals.character.cell && globals.character.cell.x == x && globals.character.cell.y == y;
 		return !globals.item_map[mapg.indexof(x,y)] && !globals.building_map[mapg.indexof(x,y)] &&
-			!(globals.character.cell.x == x && globals.character.cell.y == y);
+			!char_at;
 	},
 	hash_room: function(room) {
 		if (room) {
@@ -1462,7 +1555,10 @@ var mapg = {
 		return wiresets;
 	},
 	recalculate_power: function() {
-		_.values(globals.wires).forEach(function (n) {return n.powered = false});
+		_.values(globals.wires).forEach(function (n) {
+			n.powered = false;
+			n.power_available = 0;
+		});
 		var wiresets = mapg.collect_wiresets();
 		globals.rooms.forEach(function (room) {room.powered = room.power_src > 0;});
 		wiresets.forEach(function (wireset) {
@@ -1479,6 +1575,7 @@ var mapg = {
 				}
 			}
 			var enough_power = power_available > 0;
+			console.log(power_available);
 			room_set.entries().forEach(function (room) {
 				if (room.power_src <= 0) {
 					room.powered |= enough_power;
@@ -1488,6 +1585,7 @@ var mapg = {
 			});
 			wireset.forEach(function (wire) {
 				wire.powered = enough_power;
+				wire.power_available = power_available;
 			});
 		});
 	},
@@ -2002,7 +2100,7 @@ var draw_functions = {
 		ctx.font = "bold 20px " + defaults.font;
 		ctx.textBaseline = "bottom";
 		ctx.fillStyle = "#DD0000";
-		ctx.fillText("Score: " + Math.round(score), offset.x, offset.y);
+		ctx.fillText("Scraps: " + Math.round(score), offset.x, offset.y);
 	},
 	draw_tooltip: function(ctx, start, offset, room) {
 		var maxW = 0;
@@ -2036,13 +2134,17 @@ var draw_functions = {
 		if (!room || !room.type) {
 			return;
 		}
-
-		var text = (room.name || room.type) + " oxygen: " + Math.round(globals.character.cell.oxygen * 100) / 100;
+		var oxygen_string = "oxygen: " + Math.round(globals.character.cell.oxygen * 100) / 100;
+		var power_string = globals.character.cell.wired ? "power: " + globals.character.cell.power_available : ""; 
+		var text = (room.name || room.type) + " " + oxygen_string;
 
 		var startX = start.x + offset.x;
 		var startY = start.y + offset.y;
 		var name_str = text.replace("_"," ");
 		var lines = getLines(ctx, name_str, 200);
+		if (power_string != "") {
+			lines.push(power_string);
+		}
 		var lineHeight = 14;
 		var maxH = lines.length * lineHeight;
 		ctx.font = "bold 16px " + defaults.font;
