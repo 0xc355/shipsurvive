@@ -461,6 +461,7 @@ var core = {
 	},
 	log: function(text) {
 		globals.console.text(globals.console.text() + "\n>>" + text);
+		    $('#console').scrollTop($('#console')[0].scrollHeight);
 	},
 	add_hostile: function(type) {
 		var new_obj = new core.Hostile(type,0,0);
