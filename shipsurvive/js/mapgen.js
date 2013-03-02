@@ -70,6 +70,7 @@ var core = {
 				this.breach = 0;
 				this.passable = true;
 				this.powered = false;
+				this.prev_powered = false;
 				this.power_source = false;
 				this.fire = 0;
 				this.neighboring_rooms = [];
@@ -131,6 +132,12 @@ var core = {
 				this.type = "room";
 				this.room = room;
 				this.name = room.type;
+			},
+			reset_power: function() {
+				this.prev_powered = this.powered;
+				this.powered = false;
+				this.power_load = 0;
+				this.power_source = 0;
 			}
 		});
 		core.Actor = new JS.Class({
@@ -508,8 +515,8 @@ var core = {
 			var num = (code - 48 + 9) % 10;
 			var item = globals.inventory[num];
 			if (item && item.amount > 0) {
-				var used = items[item.type](item);
 				core.log("You use a " + item.type);
+				var used = items[item.type](item);
 				item.amount = Math.max(0, item.amount - used);
 			}
 			if (item.amount == 0) {
@@ -542,9 +549,7 @@ var core = {
 		if (next_cell && next_cell.passable && distance < 2.5) {
 			if (next_cell.wired && globals.keys.shift) {
 				next_cell.wired = false;
-				next_cell.powered = false;
-				next_cell.power_load = 0;
-				next_cell.power_source = 0;
+				next_cell.reset_power;
 				delete globals.wires[next_cell.hash_cell()];
 			} else if (!next_cell.wired &&  !globals.keys.shift){
 				next_cell.wired =  true;
@@ -1260,9 +1265,7 @@ var items = {
 		if (next_cell && next_cell.passable && distance < 2.5) {
 			if (next_cell.wired) {
 				next_cell.wired =  false;
-				next_cell.powered = false;
-				next_cell.power_load = 0;
-				next_cell.power_source = 0;
+				next_cell.reset_power();
 				delete globals.wires[next_cell.hash_cell()];
 				mapg.recalculate_power();
 				globals.inventory.add_item("wire", 1);
@@ -1533,10 +1536,7 @@ var mapg = {
 		cell.fire = new_fire;
 		if (cell.wired) {
 			cell.wired =  false;
-			cell.powered = false;
-			cell.power_load = 0;
-			cell.power_source = 0;
-			cell.power_load = 0;
+			cell.reset_power();
 			delete globals.wires[cell.hash_cell()];
 			mapg.recalculate_power();
 		}
@@ -1563,9 +1563,7 @@ var mapg = {
 						cell.fire = new_fire;
 						if (cell.wired) {
 							cell.wired =  false;
-							cell.powered = false;
-							cell.power_load = 0;
-							cell.power_source = 0;
+							cell.reset_power();
 							delete globals.wires[cell.hash_cell()];
 							mapg.recalculate_power();
 						}
@@ -1651,9 +1649,7 @@ var mapg = {
 	},
 	recalculate_power: function() {
 		_.values(globals.wires).forEach(function (n) {
-			n.powered = false;
-			n.power_load = 0;
-			n.power_source = 0;
+			n.reset_power();
 		});
 		var wiresets = mapg.collect_wiresets();
 		globals.wiresets = wiresets;
@@ -1691,7 +1687,14 @@ var mapg = {
 				wire.powered = enough_power;
 				wire.power_load = power_load;
 				wire.power_source = power_source;
-				console.log(power_source);
+				var building = globals.building_map[mapg.indexof(wire)];
+				if (building && building.power < 0 && wire.prev_powered != wire.powered) {
+					if (wire.powered) {
+						core.log(building.type + " was powered");
+					} else {
+						core.log(building.type + " was unpowered");
+					}
+				}
 			});
 		});
 	},
