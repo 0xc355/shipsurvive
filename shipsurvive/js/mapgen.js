@@ -1158,8 +1158,6 @@ var rooms = {
 		rooms.add_salvage(room, -3, 5);
 	},
 	all_function: function (room) {
-		rooms.add_building(room, "life_support", 4, 4);
-		rooms.add_building(room, "reactor", 4, 4);
 		if (Math.random() < .4) {
 			rooms.add_building(room, "rubble", 8, 20);
 		}
