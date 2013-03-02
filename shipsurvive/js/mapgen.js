@@ -781,6 +781,7 @@ var core = {
 		var new_origin = {"x":globals.character.origin.x, "y":globals.character.origin.y};
 		var dd = {x:0, y:0};
 		var moved = false;
+		var hunger_damage = false, oxygen_damage = false, cold_damage = false, heat_damage = false;
 		var original_cell = globals.character.cell;
 		globals.diffuse_counter += dt;
 		globals.flame_counter += dt;
@@ -814,6 +815,7 @@ var core = {
 			globals.character.hunger -= dt;
 		} else {
 			globals.character.health -= dt * 3;
+			hunger_damage = true;
 		}
 		var m_temp = globals.character.max_temperature;
 		var temperature = 0;
@@ -874,6 +876,7 @@ var core = {
 		}
 		if (oxygen_req > 0) {
 			globals.character.health -= oxygen_req * 5;
+			oxygen_damage = true;
 		}
 		for (var i = 0; i < globals.objs.length; i++) {
 			var obj = globals.objs[i];
@@ -891,21 +894,23 @@ var core = {
 	
 		if (globals.character.temperature < m_temp * .2) {
 			globals.character.health -= ((m_temp * .2) - globals.character.temperature) * 2 * dt;
+			cold_damage = true;
 		}
 		if (globals.character.temperature > m_temp * .8) {
 			globals.character.health -= (-(m_temp * .8) + globals.character.temperature) * 2 * dt;
+			heat_damage = true;
 		}
 		if (globals.character.health < 0) {
-			if (globals.character.temperature < m_temp * .2) {
+			if (cold_damage) {
 				core.log("You have froze to death");
 			}
-			if (globals.character.temperature > m_temp * .8) {
+			if (heat_damage) {
 				core.log("You have burned to death");
 			}
-			if (globals.character.oxygen < 0) {
+			if (oxygen_damage) {
 				core.log("You have suffocated to death");
 			}
-			if (globals.character.hunger < 0) {
+			if (hunger_damage) {
 				core.log("You have starved to death");
 			}
 			core.log("You have died");
