@@ -248,12 +248,14 @@ var core = {
 				    && this.cell == globals.character.get_welder_flame()) {
 					this.health -= dt;
 					if (this.health < 0) {
+						core.log("You have killed an alien");
 						this.health = this.max_health;
 						this.random_room();
 					}
 				} else if (this.cell == globals.character.cell) {
 					globals.red_overlay_alpha = .7;
 					globals.character.health -= 25;
+					core.log("Alien has hit you for 25 damage");
 					this.random_room();
 					while (this.cell.room == globals.character.cell.room) {
 						this.random_room();
@@ -299,6 +301,7 @@ var core = {
 			{type:"oxygen_tank", amount: 2}
 		];
 		globals.inventory.add_item = function (type, amount) {
+			core.log("You have picked up " + type + " x " + amount);
 			var item = _.find(this, function (item) {
 				return item.type == type;
 			});
@@ -371,6 +374,8 @@ var core = {
 		globals.context.background = defaults.background;
 		globals.params = {noise_size: 1, radius_size:9};
 		globals.images = {};
+		globals.console = $('#console');
+		core.reset_console();
 		core.load_images();
 		globals.screen_bounds = {
 			origin: {x: 0, y: 0},
@@ -451,6 +456,12 @@ var core = {
 			core.redraw_map();
 	    	})();
 	},
+	reset_console: function() {
+		globals.console.text("Console:");
+	},
+	log: function(text) {
+		globals.console.text(globals.console.text() + "\n>>" + text);
+	},
 	add_hostile: function(type) {
 		var new_obj = new core.Hostile(type,0,0);
 		globals.objs.push(new_obj);
@@ -497,6 +508,7 @@ var core = {
 			var item = globals.inventory[num];
 			if (item && item.amount > 0) {
 				var used = items[item.type](item);
+				core.log("You use a " + item.type);
 				item.amount = Math.max(0, item.amount - used);
 			}
 			if (item.amount == 0) {
@@ -845,6 +857,7 @@ var core = {
 			}
 			if (Math.random() < welder_flame_pos.oxygen * dt * .0075) {
 				mapg.add_fire(welder_flame_pos);
+				core.log("Something caught on fire from welding!");
 			}
 			oxygen_req += dt * 1;
 		}
@@ -877,6 +890,19 @@ var core = {
 			globals.character.health -= (-(m_temp * .8) + globals.character.temperature) * 2 * dt;
 		}
 		if (globals.character.health < 0) {
+			if (globals.character.temperature < m_temp * .2) {
+				core.log("You have froze to death");
+			}
+			if (globals.character.temperature > m_temp * .8) {
+				core.log("You have burned to death");
+			}
+			if (globals.character.oxygen < 0) {
+				core.log("You have suffocated to death");
+			}
+			if (globals.character.hunger < 0) {
+				core.log("You have starved to death");
+			}
+			core.log("You have died");
 			core.reset();
 		}
 		if (globals.red_overlay_alpha > 0) {
@@ -938,7 +964,9 @@ var buildings = {
 				core.remove_building(building);
 				if (!passable)
 					building.cell.passable = true;
-				globals.character.scraps += utilities.random_interval(min, max+1);
+				var scraps = utilities.random_interval(min, max+1);
+				globals.character.scraps += scraps;
+				core.log("You have picked up " + scraps + " " + (scraps > 1 ? "scraps" : "scrap"));
 			}
 		};
 	},
@@ -1556,8 +1584,8 @@ var mapg = {
 			var n = set[utilities.random_interval(0,set.length)];
 			var extra_power = n.power_source - n.power_load;
 			var possibility = (n.power_load - extra_power) / 10000;
-			console.log(possibility);
 			if (n.powered && Math.random() < possibility) {
+				core.log("A wire has caught on fire!")
 				mapg.add_fire(n);
 			}
 		});
