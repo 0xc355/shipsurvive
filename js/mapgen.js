@@ -1359,7 +1359,7 @@ var items = {
 		var dx = next_cell.x - globals.current_cell.x;
 		var dy = next_cell.y - globals.current_cell.y;
 		var distance = Math.sqrt(dx*dx + dy*dy);
-		if (next_cell && next_cell.passable && distance < 2.5) {
+		if (next_cell && distance < 2.5) {
 			if (next_cell.wired) {
 				next_cell.wired =  false;
 				next_cell.reset_power();
@@ -1997,6 +1997,7 @@ var mapg = {
 					cell.type = "door";
 					cell.door_health = 5;
 					cell.passable = utilities.random_interval(0,2) == 1;
+					cell.wireable = true;
 					wall_set.remove(cell);
 					room.connections.push({room:connecting_room, door:cell});
 					connecting_room.connections.push({room:room, door:cell});
