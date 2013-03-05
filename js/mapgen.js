@@ -69,17 +69,22 @@ var core = {
 				this.type = "open";
 				this.breach = 0;
 				this.passable = true;
+				this.wireable = true;
 				this.powered = false;
 				this.prev_powered = false;
 				this.power_source = false;
 				this.fire = 0;
 				this.neighboring_rooms = [];
 			},
+			toggle_door: function () {
+				this.passable = !this.passable;
+				this.wireable = this.passable;
+			},
 			hash_cell: function() {
 				return this.x + this.y * globals.bounds.width;
 			},
 			equals: function(other) {
-				return other.x == this.x && other.y == this.y;
+				return other && other.x == this.x && other.y == this.y;
 			},
 			diag_neighbors: function () {
 				var celllb = new core.Cell(this.x-1, this.y+1);
@@ -145,7 +150,7 @@ var core = {
 				this.origin = {x:x, y:y};
 				this.facing = 0;
 				this.type = type;
-				this.cell = mapg.cell_at(x,y);
+				this.cell = core.position_to_grid(x,y);
 			},
 			update_cell: function() {
 				var x = Math.floor((this.origin.x)/defaults.grid_width);
@@ -163,8 +168,11 @@ var core = {
 				}
 				var c_origin = {"x":start_origin.x * defaults.grid_width,
 							"y":start_origin.y * defaults.grid_width};
-				c_origin.x += utilities.random_interval(1, start_room.dimensions.width - 1) * defaults.grid_width;
-				c_origin.y += utilities.random_interval(1, start_room.dimensions.height - 1) * defaults.grid_width;
+				c_origin.x += utilities.random_interval(1, start_room.dimensions.width - 1)
+						* defaults.grid_width;
+				c_origin.y += utilities.random_interval(1, start_room.dimensions.height - 1)
+						* defaults.grid_width;
+
 				this.origin = c_origin;
 				this.update_cell();
 			},
@@ -180,7 +188,7 @@ var core = {
 				var x = Math.floor((new_origin.x)/defaults.grid_width);
 				var y = Math.floor((new_origin.y)/defaults.grid_width);
 				var next_room = core.check_position(x,y);
-				if (next_room && next_room.passable) {
+				if (next_room && (next_room.equals(this.cell) || next_room.passable)) {
 					this.origin.x = new_origin.x;
 					this.origin.y = new_origin.y;
 					if (!next_room.equals(this.cell)) {
@@ -193,7 +201,75 @@ var core = {
 		});
 		core.Building = new JS.Class(core.Actor, {
 			initialize: function (type, x, y) {
-				this.callSuper(type, x, y);
+				this.callSuper(type, x * defaults.grid_width,
+					       y * defaults.grid_width);
+				this.set_passable(false);
+				this.weight = .5;
+				this.push_timer = 0;
+				this.moving = false;
+				this.dtarg= {x:0, y:0};
+			},
+			set_passable: function(passable) {
+				this.passable = passable;
+				this.cell.passable = passable;
+				this.cell.wireable = !passable;
+			},
+			check_push: function(dt) {
+				/*if (this.moving) {
+					var dx = this.dtarg.x - this.origin.x;
+					var dy = this.dtarg.y - this.origin.y;
+					if (Math.abs(dx) < .0001
+					    && Math.abs(dy) < .0001) {
+						this.moving = false;
+						this.move(this.origin.x - this.dtarg.x,
+							  this.origin.y - this.dtarg.y);
+						this.dtarg.x = 0;
+						this.dtarg.y = 0;
+					} else {
+						var amount = dt * 5;
+						var dxm = 0;
+						var dym = 0;
+						if (dx != 0) {
+							dxm = Math.min(dx, amount * Math.abs(dx)/ dx);
+						}
+						if (dy != 0) {
+							dym = Math.min(dy, amount * Math.abs(dy)/ dy);
+						}
+						console.log(dxm, dym);
+						this.move(dxm, dym);
+					}
+				}*/
+				if (!this.passable) {
+					var bump_pos = globals.character.next_cell;
+					var moving_in = this.cell.equals(bump_pos);
+					if (moving_in) {
+						this.push_timer += dt;
+						if (this.push_timer > this.weight) {
+							var dx = this.cell.x - globals.character.cell.x;
+							var dy = this.cell.y - globals.character.cell.y; 
+							this.dtarg.x = (this.cell.x + dx)
+								* defaults.grid_width;
+							this.dtarg.y = (this.cell.y + dy)
+								* defaults.grid_width;
+							this.moving = true;
+							this.move(dx * defaults.grid_width,
+								  dy * defaults.grid_width);
+							this.push_timer = 0;
+						}
+					} else if (this.push_timer > 0) {
+						this.push_timer = 0;
+					}
+				}
+			},
+			update_cell: function() {
+				var x = Math.floor((this.origin.x)/defaults.grid_width);
+				var y = Math.floor((this.origin.y)/defaults.grid_width);
+				this.cell.passable = true;
+				this.cell = core.check_position(x, y);
+				delete globals.building_map[mapg.indexof(this.cell)];
+				this.cell.passable = this.passable;
+				globals.building_map[mapg.indexof(this.cell)] = this;
+				return this.cell;
 			},
 			update_function: function (dt) {
 				//do nothing
@@ -482,7 +558,10 @@ var core = {
 	add_building: function(type, x, y) {
 		var new_obj = new core.Building(type,x,y);
 		if (buildings[new_obj.type]) {
-			new_obj.update_function = buildings[new_obj.type](new_obj);
+			var func = buildings[new_obj.type](new_obj);
+			new_obj.update_function = function(dt) {
+				func(dt);
+				new_obj.check_push(dt)};
 		}
 		globals.building_map[mapg.indexof(x,y)] = new_obj;
 		globals.objs.push(new_obj);
@@ -577,7 +656,7 @@ var core = {
 				var dy = next_cell.y - globals.current_cell.y;
 				var distance = Math.sqrt(dx*dx + dy*dy);
 				if (distance < 2) {
-					next_cell.passable = !next_cell.passable;
+					next_cell.toggle_door();
 					core.recalculate_paths();
 				}
 			}
@@ -921,6 +1000,11 @@ var core = {
 		}
 		globals.current_cell = globals.character.cell;
 	},
+	position_to_grid: function(gx, gy) {
+		var x = Math.floor((gx)/defaults.grid_width);
+		var y = Math.floor((gy)/defaults.grid_width);
+		return mapg.cell_at(x,y);
+	},
 	check_position: function (x,y) {
 		if (mapg.in_bounds(x,y)) {
 			var room = globals.map_grid[mapg.indexof(x,y)];
@@ -947,7 +1031,7 @@ var buildings = {
 		return function (dt) {
 			globals.distance -= globals.on_course * building.cell.powered * dt;
 			if (globals.distance <= 0) {
-				console.log("WIN");
+				core.log("You have suvived and won!");
 				core.reset();
 			}
 		};
@@ -955,7 +1039,7 @@ var buildings = {
 	generic_salvage: function(building, hp, min, max, passable) {
 		building.power = -1;
 		passable = !!passable;
-		building.cell.passable = passable;
+		building.set_passable(passable);
 		return function (dt) {
 			if (globals.character.welder) {
 				var flame_pos = globals.character.get_welder_flame();
@@ -963,21 +1047,19 @@ var buildings = {
 			} else {
 				var in_flame = false;
 			}
-			if (!passable) {
-				var bump_pos = globals.character.next_cell;
-			} else {
-				var bump_pos = globals.character.cell;
-			}
-			var moving_in = bump_pos.equals(building.cell);
 
-			hp -= dt * (in_flame * 1 + moving_in * .33);
+			var cpos = globals.character.cell;
+			var inside = cpos.equals(building.cell);
+
+			hp -= dt * (in_flame * 1 + inside * .33);
 			if (hp <= 0) {
 				core.remove_building(building);
 				if (!passable)
 					building.cell.passable = true;
 				var scraps = utilities.random_interval(min, max+1);
 				globals.character.scraps += scraps;
-				core.log("You have picked up " + scraps + " " + (scraps > 1 ? "scraps" : "scrap"));
+				core.log("You have picked up " + scraps + " "
+					 + (scraps > 1 ? "scraps" : "scrap"));
 			}
 		};
 	},
@@ -1197,7 +1279,7 @@ var rooms = {
 		rooms.add_salvage(room, -3, 5);
 	},
 	all_function: function (room) {
-		if (Math.random() < .4) {
+		if (Math.random() < 1) {
 			rooms.add_building(room, "rubble", 8, 20);
 		}
 		rooms.add_building(room, "terminal", 1, 1);
@@ -1232,10 +1314,8 @@ var items = {
 	welder: function(item) {
 		item.in_use = !item.in_use;
 		if (item.in_use) {
-			console.log("welder on");
 			globals.character.welder += 1;
 		} else {
-			console.log("welder off");
 			globals.character.welder -= 1;
 		}
 		return 0;
@@ -1509,7 +1589,9 @@ var mapg = {
 		var next_cell = utilities.bresenham_line(from, to);
 		var cell = next_cell();
 		while (cell) {
-			if (!globals.map_grid[mapg.indexof(cell)].passable) {
+			var gcell = globals.map_grid[mapg.indexof(cell)];
+			var building = globals.building_map[mapg.indexof(cell)];
+			if (!gcell.passable && !building) {
 				return true;
 			}
 			cell = next_cell();
@@ -1576,11 +1658,7 @@ var mapg = {
 				}
 			}
 		});
-		if (dead_flames.length > 0)
-		console.log(globals.fires, dead_flames);
 		globals.fires = _.difference(globals.fires, dead_flames);
-		if (dead_flames.length > 0)
-		console.log(globals.fires);
 		globals.fires = globals.fires.concat(new_flames);
 	},
 	check_for_short: function() {
@@ -1673,7 +1751,6 @@ var mapg = {
 						power_load -= building.power;
 					} else {
 						power_source += building.power;
-						console.log(power_source);
 					}
 				} else {
 					power_available -= 1;
@@ -1880,6 +1957,7 @@ var mapg = {
 					if (!grid_cell) {
 						grid[grid_index] = cell;
 						cell.passable = false;
+						cell.wireable = false;
 						cell.type = "wall";
 						wall_set.add(cell);
 					} else if (grid_cell.type == "wall"
