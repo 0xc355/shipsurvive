@@ -208,11 +208,37 @@ var core = {
 				this.push_timer = 0;
 				this.moving = false;
 				this.dtarg= {x:0, y:0};
+				this.min_scrap = 7;
+				this.max_scrap = 10;
+				this.hp = 2;
 			},
 			set_passable: function(passable) {
 				this.passable = passable;
 				this.cell.passable = passable;
-				this.cell.wireable = !passable;
+				this.cell.wireable = true;
+			},
+			check_hp: function (dt) {
+				if (globals.character.welder) {
+					var flame_pos = globals.character.get_welder_flame();
+					var in_flame = flame_pos.equals(this.cell);
+				} else {
+					var in_flame = false;
+				}
+
+				var cpos = globals.character.cell;
+				var inside = cpos.equals(this.cell);
+
+				this.hp -= dt * (in_flame * 1 + inside * .33);
+				if (this.hp <= 0) {
+					core.remove_building(this);
+					if (!this.passable)
+						this.cell.passable = true;
+					var scraps = utilities.random_interval(this.min_scrap,
+									       this.max_scrap+1);
+					globals.character.scraps += scraps;
+					core.log("You have picked up " + scraps + " "
+						 + (scraps > 1 ? "scraps" : "scrap"));
+				}
 			},
 			check_push: function(dt) {
 				/*if (this.moving) {
@@ -561,7 +587,8 @@ var core = {
 			var func = buildings[new_obj.type](new_obj);
 			new_obj.update_function = function(dt) {
 				func(dt);
-				new_obj.check_push(dt)};
+				new_obj.check_push(dt);
+				new_obj.check_hp(dt);}
 		}
 		globals.building_map[mapg.indexof(x,y)] = new_obj;
 		globals.objs.push(new_obj);
@@ -625,7 +652,7 @@ var core = {
 		var dx = next_cell.x - globals.current_cell.x;
 		var dy = next_cell.y - globals.current_cell.y;
 		var distance = Math.sqrt(dx*dx + dy*dy);
-		if (next_cell && next_cell.passable && distance < 2.5) {
+		if (next_cell && next_cell.wireable && distance < 2.5) {
 			if (next_cell.wired && globals.keys.shift) {
 				next_cell.wired = false;
 				next_cell.reset_power;
@@ -1040,27 +1067,10 @@ var buildings = {
 		building.power = -1;
 		passable = !!passable;
 		building.set_passable(passable);
+		building.hp = hp;
+		building.min_scrap = min;
+		building.max_scrap = max;
 		return function (dt) {
-			if (globals.character.welder) {
-				var flame_pos = globals.character.get_welder_flame();
-				var in_flame = flame_pos.equals(building.cell);
-			} else {
-				var in_flame = false;
-			}
-
-			var cpos = globals.character.cell;
-			var inside = cpos.equals(building.cell);
-
-			hp -= dt * (in_flame * 1 + inside * .33);
-			if (hp <= 0) {
-				core.remove_building(building);
-				if (!passable)
-					building.cell.passable = true;
-				var scraps = utilities.random_interval(min, max+1);
-				globals.character.scraps += scraps;
-				core.log("You have picked up " + scraps + " "
-					 + (scraps > 1 ? "scraps" : "scrap"));
-			}
 		};
 	},
 	small_salvage: function(building) {
@@ -1322,7 +1332,9 @@ var items = {
 	},
 	medipack: function(item) {
 		var amount = item.quality || 10;
-		globals.character.health = Math.min(globals.character.max_health, globals.character.health + amount);
+		globals.character.health = Math.min(
+			globals.character.max_health,
+			globals.character.health + amount);
 		return 1;
 	},
 	wire: function (item) {
@@ -1331,7 +1343,7 @@ var items = {
 		var dx = next_cell.x - globals.current_cell.x;
 		var dy = next_cell.y - globals.current_cell.y;
 		var distance = Math.sqrt(dx*dx + dy*dy);
-		if (next_cell && next_cell.passable && distance < 2.5) {
+		if (next_cell && next_cell.wireable && distance < 2.5) {
 			if (!next_cell.wired) {
 				next_cell.wired =  true;
 				globals.wires[next_cell.hash_cell()] = next_cell;
