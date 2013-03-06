@@ -407,7 +407,13 @@ var core = {
 			{type:"wire_cutter", amount:1},
 			{type:"welder", amount:1},
 			{type:"wire", amount: 20},
-			{type:"oxygen_tank", amount: 2}
+			{type:"oxygen_tank", amount: 2},
+			{type:"none", amount: 0},
+			{type:"none", amount: 0},
+			{type:"none", amount: 0},
+			{type:"none", amount: 0},
+			{type:"none", amount: 0},
+			{type:"none", amount: 0},
 		];
 		globals.inventory.add_item = function (type, amount) {
 			core.log("You have picked up " + type + " x " + amount);
@@ -417,7 +423,11 @@ var core = {
 			if (item) {
 				item.amount += amount;
 			} else {
-				this.push({type:type, amount:amount});
+				var slot = _.find(this, function (item) {
+					return item.type == "none";
+				});
+				slot.amount += amount;
+				slot.type = type;
 			}
 		};
 		globals.score = 0;
@@ -626,7 +636,7 @@ var core = {
 				item.amount = Math.max(0, item.amount - used);
 			}
 			if (item.amount == 0) {
-				globals.inventory.splice(num, 1);
+				globals.inventory[num].type = "none";
 			}
 		}
 	},
@@ -2181,7 +2191,7 @@ var draw_functions = {
 	},
 	draw_inventory: function(ctx, items, width) {
 		var i = 0;
-		var offset = {x: 10, y:globals.screen_bounds.size.height - 30 - width};
+		var offset = {x: 60, y:globals.screen_bounds.size.height - 30 - width};
 		ctx.fillStyle = "#00BB00";
 		items.forEach(function (item) {
 			if (item.in_use) {
@@ -2198,7 +2208,9 @@ var draw_functions = {
 			if (img) {
 				ctx.drawImage(img, x+14, y+14);
 			}
-			ctx.fillText(item.amount, x + 2, y + 2);
+			if (item.amount > 0) {
+				ctx.fillText(item.amount, x + 2, y + 2);
+			}
 			i += 1;
 		});
 	},
