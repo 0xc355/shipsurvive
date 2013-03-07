@@ -1,7 +1,21 @@
 /* generates a map graph */
 $(function(){
  "use strict";
-var globals = {},
+var globals = {
+	available_buildings : [
+		{name:"reactor", cost:50},
+		{name:"kitchen", cost:80},
+		{name:"breach", cost:-3},
+		{name:"rubble", cost:10},
+		{name:"engine", cost:500},
+		{name:"autopilot", cost:2000},
+		{name:"terminal", cost:100},
+		{name:"food_generator", cost:20},
+		{name:"life_support", cost:50},
+		{name:"medical_bay", cost:150},
+		{name:"replicator", cost:150}
+	]
+},
 defaults = {
 	background: 'white',
 	grid_offset:{"x":0, "y":0},
@@ -501,6 +515,20 @@ var core = {
 		$("#noise_slider").slider({max:100, min:0, step:1, value:5, slide:core.change_noise});
 		$("p#size_display").text("Light Size: " + globals.light_cone);
 		$("p#noise_display").text("Oxygen level: " + defaults.base_oxygen_level);
+		var input_area = $('input#text_input');
+		var output_area = $('input#text_output');
+		input_area.bind("propertychange keyup input paste", function(event) {
+				var in_string = core.clean_build_string(input_area.val());
+				var building = _.findWhere(globals.available_buildings, {name:in_string});
+				if (building) {
+					output_area.val(building.cost);
+					globals.selected_building = building;
+				} else {
+					output_area.val("N/A");
+					globals.selected_building = undefined;
+				}
+			}
+		)
 
 		var ratio = core.hiDPIRatio();
 		if (ratio != 1) {
@@ -514,7 +542,7 @@ var core = {
 			globals.context.scale(ratio, ratio);
 		}
 		globals.context.font = defaults.font;
-		cv.addEventListener('click', core.toggle_door, true);
+		cv.addEventListener('click', core.primary_click, true);
 		cv.addEventListener('contextmenu', core.pause, true);
 		cv.addEventListener('mousedown', core.mouse_down, true);
 		cv.addEventListener('mouseup', core.mouse_up, true);
@@ -659,26 +687,52 @@ var core = {
 		}
 		mapg.recalculate_power();
 	},
-	toggle_door: function () {
+	primary_click: function () {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
-		if (next_cell && next_cell.type == "door"
-		    		&& next_cell != globals.current_cell
-	    			&& !next_cell.wired) {
+		if (next_cell) {
+			if (next_cell.type == "door") {
+				core.toggle_door(next_cell);
+			}
+			else if (next_cell.type == "room") {
+				core.build(next_cell);
+			}
+		}
+	},
+	clean_build_string: function(str) {
+		return str.replace(" ", "_").toLowerCase();
+	},
+	build: function (cell) {
+		if (globals.selected_building) {
+			if (cell != globals.current_cell && cell.passable) {
+				if (globals.character.scraps >= globals.selected_building.cost) {
+					core.add_building(globals.selected_building.name,
+							  cell.x, cell.y);
+					globals.character.scraps -= globals.selected_building.cost;
+					core.log("You built a " + globals.selected_building.name
+						 + " with " + globals.selected_building.cost + " scraps.");
+					mapg.recalculate_power();
+				}
+			}
+		}
+	},
+	toggle_door: function (cell) {
+		if (cell != globals.current_cell
+	    		&& !cell.wired) {
 			var collided = false;
 			for (var i = 0; i < globals.objs.length; i++) {
 				var obj = globals.objs[i];
-				if (next_cell == obj.cell) {
+				if (cell == obj.cell) {
 					collided = true;
 					break;
 				}
 			}
 			if (!collided) {
-				var dx = next_cell.x - globals.current_cell.x;
-				var dy = next_cell.y - globals.current_cell.y;
+				var dx = cell.x - globals.current_cell.x;
+				var dy = cell.y - globals.current_cell.y;
 				var distance = Math.sqrt(dx*dx + dy*dy);
 				if (distance < 2) {
-					next_cell.toggle_door();
+					cell.toggle_door();
 					core.recalculate_paths();
 				}
 			}
@@ -781,9 +835,6 @@ var core = {
 				} else {
 					angle_opacity = 1;
 				}
-				if (cell.breach > 0) {
-					breaches.push({position:cell, item:{type:"breach"}});
-				}
 
 				distance_opacity = Math.min(1, m_dist / 2);
 				var powered;
@@ -836,7 +887,7 @@ var core = {
 		if (globals.current_cell) {
 			draw_functions.draw_tooltip(globals.context, {"x":0, "y":0}, {"x":10, "y":10}, globals.current_cell);
 		}
-		draw_functions.draw_score(globals.context, {"x":globals.screen_bounds.size.width- 130, "y":5},
+		draw_functions.draw_score(globals.context, {"x":globals.screen_bounds.size.width- 180, "y":5},
 						globals.character.scraps);
 		draw_functions.draw_healthbar(globals.context, "#FF0000", globals.character.health/globals.character.max_health,
 					      {x:globals.screen_bounds.size.width - 20, y:30});
@@ -956,9 +1007,6 @@ var core = {
 		}
 		if (globals.character.welder > 0 && welder_flame_pos) {
 			temperature += 2;
-			if (welder_flame_pos.breach > 0) {
-				welder_flame_pos.breach = Math.max(0, welder_flame_pos.breach - dt);
-			}
 			if (welder_flame_pos.door_health > 0) {
 				welder_flame_pos.door_health = Math.max(0, welder_flame_pos.door_health - dt);
 				if (welder_flame_pos.door_health == 0) {
@@ -1161,6 +1209,15 @@ var buildings = {
 			}
 		}
 	},
+	breach: function(building) {
+		building.set_passable(true);
+		building.hp = 5;
+		building.min_scrap = 0;
+		building.max_scrap = 0;
+		return function (dt) {
+			building.cell.oxygen = Math.max(-20, building.cell.oxygen - 20 * dt);
+		}
+	},
 	reactor: function(building) {
 		building.power = 50;
 		var reactor_heat = .1;
@@ -1312,6 +1369,7 @@ var rooms = {
 		if (Math.random() < .2) {
 			rooms.add_building(room, "replicator", 1, 1);
 		}
+		rooms.add_building(room, "breach", -5, 5);
 	}
 };
 var items = {
@@ -1718,9 +1776,7 @@ var mapg = {
 			for (var x = 1; x < globals.bounds.width - 1; x++) {
 				var cell = mapg.cell_at(x,y);
 				if (cell && cell.passable) {
-					var escaped_oxygen = cell.breach * 5;
-					var min_oxygen = cell.breach * -20;
-					cell.oxygen = Math.max(cell.next_oxygen - escaped_oxygen, min_oxygen);
+					cell.oxygen = cell.next_oxygen;
 				}
 			}
 		}
@@ -1920,9 +1976,7 @@ var mapg = {
 					if (cell) {
 						cells_displaced.add(cell);
 					} else {
-						var breach = Math.random() < defaults.breach_chance ? Math.random() + 1 : 0;
 						cell = new core.Cell(x,y);
-						cell.breach = breach;
 						map_grid[mapg.indexof(x,y)] = cell;
 					}
 					cell.set_room(room);
