@@ -166,6 +166,8 @@ var core = {
 				this.type = type;
 				this.cell = core.position_to_grid(x,y);
 			},
+			die: function() {
+			},
 			update_cell: function() {
 				this.pre_update();
 				var x = Math.floor((this.origin.x)/defaults.grid_width);
@@ -258,6 +260,8 @@ var core = {
 					globals.character.scraps += scraps;
 					core.log("You have picked up " + scraps + " "
 						 + (scraps > 1 ? "scraps" : "scrap"));
+					this.post_update();
+					this.die();
 				}
 			},
 			check_push: function(dt) {
@@ -1234,6 +1238,9 @@ var buildings = {
 				this.cell.room.heat += reactor_heat;
 			}
 		}
+		building.die = function () {
+			mapg.add_fire(building.cell);
+		}
 		return function (dt) {};
 	}
 };
@@ -1721,7 +1728,7 @@ var mapg = {
 		var dead_flames = [];
 		var new_flames = [];
 		globals.fires.forEach(function (flame) {
-			flame.cell.oxygen = Math.max(0, flame.cell.oxygen - 2.5 * dt);
+			flame.cell.oxygen = Math.max(0, flame.cell.oxygen - 1.5 * dt);
 			if (flame.cell.oxygen == 0) {
 				dead_flames.push(flame);
 				flame.cell.fire = false;
