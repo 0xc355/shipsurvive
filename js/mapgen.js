@@ -1095,7 +1095,9 @@ var buildings = {
 	terminal: function(building) {
 		building.power = -25;
 		return function (dt) {
-			building.cell.room.powered = building.cell.powered;
+			if (building.cell.room) {
+				building.cell.room.powered = building.cell.powered;
+			}
 		};
 	},
 	life_support: function(building) {
