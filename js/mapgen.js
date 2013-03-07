@@ -241,30 +241,6 @@ var core = {
 				}
 			},
 			check_push: function(dt) {
-				/*if (this.moving) {
-					var dx = this.dtarg.x - this.origin.x;
-					var dy = this.dtarg.y - this.origin.y;
-					if (Math.abs(dx) < .0001
-					    && Math.abs(dy) < .0001) {
-						this.moving = false;
-						this.move(this.origin.x - this.dtarg.x,
-							  this.origin.y - this.dtarg.y);
-						this.dtarg.x = 0;
-						this.dtarg.y = 0;
-					} else {
-						var amount = dt * 5;
-						var dxm = 0;
-						var dym = 0;
-						if (dx != 0) {
-							dxm = Math.min(dx, amount * Math.abs(dx)/ dx);
-						}
-						if (dy != 0) {
-							dym = Math.min(dy, amount * Math.abs(dy)/ dy);
-						}
-						console.log(dxm, dym);
-						this.move(dxm, dym);
-					}
-				}*/
 				if (!this.passable) {
 					var bump_pos = globals.character.next_cell;
 					var moving_in = this.cell.equals(bump_pos);
@@ -280,6 +256,7 @@ var core = {
 							this.moving = true;
 							this.move(dx * defaults.grid_width,
 								  dy * defaults.grid_width);
+							mapg.recalculate_power();
 							this.push_timer = 0;
 						}
 					} else if (this.push_timer > 0) {
@@ -291,8 +268,8 @@ var core = {
 				var x = Math.floor((this.origin.x)/defaults.grid_width);
 				var y = Math.floor((this.origin.y)/defaults.grid_width);
 				this.cell.passable = true;
-				this.cell = core.check_position(x, y);
 				delete globals.building_map[mapg.indexof(this.cell)];
+				this.cell = core.check_position(x, y);
 				this.cell.passable = this.passable;
 				globals.building_map[mapg.indexof(this.cell)] = this;
 				return this.cell;
@@ -1094,6 +1071,12 @@ var buildings = {
 	},
 	terminal: function(building) {
 		building.power = -25;
+		building.old_f = building.update_cell;
+		building.update_cell = function () {
+			if (building.cell.room && building.cell.room.powered)
+				building.cell.room.powered = false;
+			building.old_f();
+		}
 		return function (dt) {
 			if (building.cell.room) {
 				building.cell.room.powered = building.cell.powered;
@@ -1760,7 +1743,6 @@ var mapg = {
 		});
 		var wiresets = mapg.collect_wiresets();
 		globals.wiresets = wiresets;
-		globals.rooms.forEach(function (room) {room.powered = room.power_src > 0;});
 		wiresets.forEach(function (wireset) {
 			var room_set = new JS.Set();
 			var power_available = 0;
@@ -1782,13 +1764,6 @@ var mapg = {
 				}
 			}
 			var enough_power = power_available > 0;
-			room_set.entries().forEach(function (room) {
-				if (room.power_src <= 0) {
-					room.powered |= enough_power;
-				} else {
-					room.powered = true;
-				}
-			});
 			wireset.forEach(function (wire) {
 				wire.powered = enough_power;
 				wire.power_load = power_load;
