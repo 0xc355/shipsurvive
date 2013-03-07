@@ -153,10 +153,16 @@ var core = {
 				this.cell = core.position_to_grid(x,y);
 			},
 			update_cell: function() {
+				this.pre_update();
 				var x = Math.floor((this.origin.x)/defaults.grid_width);
 				var y = Math.floor((this.origin.y)/defaults.grid_width);
 				this.cell = core.check_position(x, y);
+				this.post_update();
 				return this.cell;
+			},
+			pre_update: function () {
+			},
+			post_update: function () {
 			},
 			random_room: function() {
 				var start_room;
@@ -265,6 +271,7 @@ var core = {
 				}
 			},
 			update_cell: function() {
+				this.pre_update();
 				var x = Math.floor((this.origin.x)/defaults.grid_width);
 				var y = Math.floor((this.origin.y)/defaults.grid_width);
 				this.cell.passable = true;
@@ -272,6 +279,7 @@ var core = {
 				this.cell = core.check_position(x, y);
 				this.cell.passable = this.passable;
 				globals.building_map[mapg.indexof(this.cell)] = this;
+				this.post_update();
 				return this.cell;
 			},
 			update_function: function (dt) {
@@ -868,6 +876,7 @@ var core = {
 		}
 	},
 	update: function(dt) {
+		dt = Math.min(.1, dt);
 		if (globals.pause) {return;}
 		globals.timer += dt;
 		globals.score += dt * 10;
@@ -1071,11 +1080,9 @@ var buildings = {
 	},
 	terminal: function(building) {
 		building.power = -25;
-		building.old_f = building.update_cell;
-		building.update_cell = function () {
+		building.pre_update = function () {
 			if (building.cell.room && building.cell.room.powered)
 				building.cell.room.powered = false;
-			building.old_f();
 		}
 		return function (dt) {
 			if (building.cell.room) {
@@ -1156,6 +1163,20 @@ var buildings = {
 	},
 	reactor: function(building) {
 		building.power = 50;
+		var reactor_heat = .1;
+		if (building.cell.room) {
+			building.cell.room.heat += reactor_heat;
+		}
+		building.pre_update = function () {
+			if (this.cell.room) {
+				this.cell.room.heat -= reactor_heat;
+			}
+		}
+		building.post_update = function () {
+			if (this.cell.room) {
+				this.cell.room.heat += reactor_heat;
+			}
+		}
 		return function (dt) {};
 	}
 };
@@ -1368,6 +1389,9 @@ var items = {
 };
 
 var utilities = {
+	round: function (num, decimal) {
+		return Math.round(num * decimal) / decimal;
+	},
 	dfs: function(root, adjacent) {
 		var results = new JS.Set([root]);
 		var node_stack = adjacent(root);
@@ -2051,13 +2075,12 @@ var mapg = {
 			}
 			room.type = room.name;
 			room.connections = [];
+			room.heat = 0;
 			if (globals.powered_rooms[room.type]) {
 				room.powered = true;
-				room.heat = 1;
 				room.power_src = globals.powered_rooms[room.type];
 			} else {
 				room.powered = false;
-				room.heat = 0;
 				room.power_src = 0;
 			}
 			var dead_cells = place_room(room, map_grid);
@@ -2341,18 +2364,25 @@ var draw_functions = {
 			"power source: " + globals.character.cell.power_source : ""; 
 		var power_load = globals.character.cell.wired ?
 			"power load: " + globals.character.cell.power_load : ""; 
-		var text = (room.name || room.type) + " " + oxygen_string;
+		if (globals.character.cell.room) {
+			var heat_string = "heat: " + utilities.round(globals.character.cell.room.heat,10);
+		} else {
+			var heat_string = "";
+		}
+		var text = (room.name || room.type) + "\n" + oxygen_string + "\n" + heat_string;
 
 		var startX = start.x + offset.x;
 		var startY = start.y + offset.y;
 		var name_str = text.replace("_"," ");
-		var lines = getLines(ctx, name_str, 200);
+		var lines = [room.name || room.type, oxygen_string, heat_string];
+		//var lines = getLines(ctx, name_str, 200);
 		if (power_source != "") {
 			lines.push(power_source);
 			lines.push(power_load);
 		}
 		var lineHeight = 14;
 		var maxH = lines.length * lineHeight;
+		var maxW = 200;
 		ctx.font = "bold 16px " + defaults.font;
 		ctx.fillStyle = "rgba(100,150,255,.7)";
 		ctx.fillRect(startX, startY, maxW + 20, maxH + 10);
