@@ -1323,7 +1323,7 @@ var rooms = {
 	},
 	mini_reactor: function (room) {
 		rooms.add_building(room, "reactor", 3, 5);
-		rooms.add_building(room, "cooler", 2, 2);
+		rooms.add_building(room, "cooler", 0, 1);
 		rooms.add_salvage(room, -1, 2);
 	},
 	large_reactor: function (room) {
