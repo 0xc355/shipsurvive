@@ -5,7 +5,10 @@ var globals = {
 	available_buildings : [
 		{name:"reactor", cost:50},
 		{name:"kitchen", cost:80},
-		{name:"breach", cost:-3},
+		{name:"breach", cost:-3, passable:true},
+		{name:"small_salvage", passable:true},
+		{name:"large_salvage", passable:true},
+		{name:"medium_salvage",  passable:true},
 		{name:"rubble", cost:10},
 		{name:"engine", cost:500},
 		{name:"autopilot", cost:2000},
@@ -290,13 +293,14 @@ var core = {
 			},
 			update_cell: function() {
 				this.pre_update();
+				var map = this.passable ? globals.building_map : globals.under_building_map;
 				var x = Math.floor((this.origin.x)/defaults.grid_width);
 				var y = Math.floor((this.origin.y)/defaults.grid_width);
 				this.cell.passable = true;
-				delete globals.building_map[mapg.indexof(this.cell)];
+				delete map[mapg.indexof(this.cell)];
 				this.cell = core.check_position(x, y);
 				this.cell.passable = this.passable;
-				globals.building_map[mapg.indexof(this.cell)] = this;
+				map[mapg.indexof(this.cell)] = this;
 				this.post_update();
 				return this.cell;
 			},
@@ -401,6 +405,7 @@ var core = {
 		globals.item_map = [];
 		globals.wiresets = [];
 		globals.building_map = [];
+		globals.under_building_map = [];
 		globals.max_distance = 3000;
 		globals.distance = globals.max_distance;
 		globals.on_course = false;
@@ -524,7 +529,7 @@ var core = {
 		input_area.bind("propertychange keyup input paste", function(event) {
 				var in_string = core.clean_build_string(input_area.val());
 				var building = _.findWhere(globals.available_buildings, {name:in_string});
-				if (building) {
+				if (building && building.cost) {
 					output_area.val(building.cost);
 					globals.selected_building = building;
 				} else {
@@ -606,7 +611,11 @@ var core = {
 	},
 	remove_building: function(building) {
 		globals.objs.splice(globals.objs.indexOf(building), 1);
-		delete globals.building_map[mapg.indexof(building.cell.x, building.cell.y)];
+		if (!building.passable) {
+			delete globals.building_map[mapg.indexof(building.cell.x, building.cell.y)];
+		} else {
+			delete globals.under_building_map[mapg.indexof(building.cell.x, building.cell.y)];
+		}
 	},
 	add_building: function(type, x, y) {
 		var new_obj = new core.Building(type,x,y);
@@ -617,7 +626,11 @@ var core = {
 				new_obj.check_push(dt);
 				new_obj.check_hp(dt);}
 		}
-		globals.building_map[mapg.indexof(x,y)] = new_obj;
+		if (new_obj.passable) {
+			globals.under_building_map[mapg.indexof(x,y)] = new_obj;
+		} else {
+			globals.building_map[mapg.indexof(x,y)] = new_obj;
+		}
 		globals.objs.push(new_obj);
 		return new_obj;
 	},
@@ -1270,8 +1283,11 @@ var rooms = {
 		var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
 		var y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
 		var count = 10;
+		var building_arch = _.findWhere(globals.available_buildings, {name:building});
+		var map = building_arch.passable
+				? globals.under_building_map : globals.building_map;
 		for (var i = 0; i < number; i++ ) {
-			while (globals.building_map[mapg.indexof(x,y)]) {
+			while (map[mapg.indexof(x,y)]) {
 				x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
 				y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
 				count -= 1;
@@ -1552,9 +1568,10 @@ var utilities = {
 }
 
 var mapg = {
-	nothing_at: function(x, y) {
+	nothing_at: function(x, y, under) {
+		var map = under ? globals.under_building_map : globals.building_map;
 		var char_at = globals.character.cell && globals.character.cell.x == x && globals.character.cell.y == y;
-		return !globals.item_map[mapg.indexof(x,y)] && !globals.building_map[mapg.indexof(x,y)] &&
+		return !globals.item_map[mapg.indexof(x,y)] && !map[mapg.indexof(x,y)] &&
 			!char_at;
 	},
 	hash_room: function(room) {
@@ -1838,12 +1855,23 @@ var mapg = {
 			for (var i = 0; i < wireset.length; i++) {
 				var wire = wireset[i];
 				var building = globals.building_map[mapg.indexof(wire.x, wire.y)];
-				if (building) {
-					power_available += building.power;
-					if (building.power < 0) {
-						power_load -= building.power;
-					} else {
-						power_source += building.power;
+				var ubuilding = globals.under_building_map[mapg.indexof(wire.x, wire.y)];
+				if (building || ubuilding) {
+					if (ubuilding) {
+						power_available += ubuilding.power;
+						if (ubuilding.power < 0) {
+							power_load -= ubuilding.power;
+						} else {
+							power_source += ubuilding.power;
+						}
+					}
+					if (building) {
+						power_available += building.power;
+						if (building.power < 0) {
+							power_load -= building.power;
+						} else {
+							power_source += building.power;
+						}
 					}
 				} else {
 					power_available -= 1;
@@ -1861,6 +1889,14 @@ var mapg = {
 						core.log(building.type + " was powered");
 					} else {
 						core.log(building.type + " was unpowered");
+					}
+				}
+				var ubuilding = globals.under_building_map[mapg.indexof(wire)];
+				if (ubuilding && ubuilding.power < 0 && wire.prev_powered != wire.powered) {
+					if (wire.powered) {
+						core.log(ubuilding.type + " was powered");
+					} else {
+						core.log(ubuilding.type + " was unpowered");
 					}
 				}
 			});
