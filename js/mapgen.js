@@ -4,6 +4,7 @@ $(function(){
 var globals = {
 	available_buildings : [
 		{name:"reactor", cost:50},
+		{name:"cooler", cost:100},
 		{name:"kitchen", cost:80},
 		{name:"breach", cost:-3, passable:true},
 		{name:"small_salvage", passable:true},
@@ -66,6 +67,7 @@ var core = {
 		core.load_image("kitchen", true);
 		core.load_image("rubble", true);
 		core.load_image("reactor", true);
+		core.load_image("cooler", true);
 		core.load_image("small_salvage", true);
 		core.load_image("medium_salvage", true);
 		core.load_image("large_salvage", true);
@@ -519,7 +521,6 @@ var core = {
 		globals.room_size = 50;
 		globals.light_cone = 200;
 		globals.wires = [];
-		globals.powered_rooms = {mini_reactor:300, large_reactor:1000};
 		$("#size_slider").slider({max:360, min:0, step:1, value:globals.light_cone, slide:core.change_size});
 		$("#noise_slider").slider({max:100, min:0, step:1, value:5, slide:core.change_noise});
 		$("p#size_display").text("Light Size: " + globals.light_cone);
@@ -979,7 +980,14 @@ var core = {
 			}
 			core.recalculate_paths();
 		}
+		/* update the room and buildings */
 		globals.room_func.forEach(function (func) {func(dt);});
+		globals.rooms.forEach(function (room) {room.heat = 0;});
+		for (var i = 0; i < globals.objs.length; i++) {
+			var obj = globals.objs[i];
+			obj.update_function(dt);
+		}
+		/* update character */
 		var moved_distance = dd.x != 0 || dd.y != 0 ? 1 : 0;
 		if (globals.character.hunger > 0) {
 			globals.character.hunger -= dt;
@@ -1030,7 +1038,10 @@ var core = {
 					welder_flame_pos.type = "open";
 				}
 			}
-			if (Math.random() < welder_flame_pos.oxygen * dt * .0075) {
+			var heat = welder_flame_pos.room ? welder_flame_pos.room.heat : 0;
+			var heat_multiplier = Math.pow(2, heat) * 1;
+			var chance = welder_flame_pos.oxygen * dt * .0075 * heat_multiplier;
+			if (Math.random() < chance) {
 				mapg.add_fire(welder_flame_pos);
 				core.log("Something caught on fire from welding!");
 			}
@@ -1044,10 +1055,6 @@ var core = {
 		if (oxygen_req > 0) {
 			globals.character.health -= oxygen_req * 5;
 			oxygen_damage = true;
-		}
-		for (var i = 0; i < globals.objs.length; i++) {
-			var obj = globals.objs[i];
-			obj.update_function(dt);
 		}
 
 		var temperature_differential = globals.character.temperature
@@ -1235,26 +1242,27 @@ var buildings = {
 			building.cell.oxygen = Math.max(-20, building.cell.oxygen - 20 * dt);
 		}
 	},
+	cooler: function(building) {
+		building.power = -50;
+		var cooler_heat = -.5;
+		return function (dt) {
+			if (building.cell.room) {
+				var multiplier = building.cell.powered ? 1 : .2;
+				building.cell.room.heat += cooler_heat * multiplier;
+			}
+		};
+	},
 	reactor: function(building) {
 		building.power = 50;
 		var reactor_heat = .1;
-		if (building.cell.room) {
-			building.cell.room.heat += reactor_heat;
-		}
-		building.pre_update = function () {
-			if (this.cell.room) {
-				this.cell.room.heat -= reactor_heat;
-			}
-		}
-		building.post_update = function () {
-			if (this.cell.room) {
-				this.cell.room.heat += reactor_heat;
-			}
-		}
 		building.die = function () {
 			mapg.add_fire(building.cell);
 		}
-		return function (dt) {};
+		return function (dt) {
+			if (building.cell.room) {
+				building.cell.room.heat += reactor_heat;
+			}
+		};
 	}
 };
 var rooms = {
@@ -1298,16 +1306,9 @@ var rooms = {
 	},
 	freezer: function (room) {
 		rooms.add_salvage(room, 5, 15);
-		return function (dt) {
-			if (room.powered) {
-				room.heat = -3;
-			} else {
-				room.heat = -.5;
-			}
-		};
+		rooms.add_building(room, "cooler", 4, 6);
 	},
 	kitchen: function (room) {
-		room.heat = .2;
 		rooms.add_building(room, "kitchen", 1, 1);
 		rooms.add_building(room, "food_generator", 1, 3);
 		rooms.add_salvage(room, -3, 6);
@@ -1322,10 +1323,12 @@ var rooms = {
 	},
 	mini_reactor: function (room) {
 		rooms.add_building(room, "reactor", 3, 5);
+		rooms.add_building(room, "cooler", 2, 2);
 		rooms.add_salvage(room, -1, 2);
 	},
 	large_reactor: function (room) {
 		rooms.add_building(room, "reactor", 5, 10);
+		rooms.add_building(room, "cooler", 1, 2);
 		rooms.add_salvage(room, -1, 4);
 	},
 	medical_bay: function (room) {
@@ -1778,7 +1781,9 @@ var mapg = {
 		globals.wiresets.forEach(function (set) {
 			var n = set[utilities.random_interval(0,set.length)];
 			var extra_power = n.power_source - n.power_load;
-			var possibility = (n.power_load - extra_power) / 10000;
+			var heat = n.room ? n.room.heat : 0;
+			var heat_multiplier = Math.pow(2, heat) * 1;
+			var possibility = (n.power_load - extra_power) * heat_multiplier / 10000;
 			if (n.powered && Math.random() < possibility) {
 				core.log("A wire has caught on fire!")
 				mapg.add_fire(n);
@@ -2173,13 +2178,6 @@ var mapg = {
 			room.type = room.name;
 			room.connections = [];
 			room.heat = 0;
-			if (globals.powered_rooms[room.type]) {
-				room.powered = true;
-				room.power_src = globals.powered_rooms[room.type];
-			} else {
-				room.powered = false;
-				room.power_src = 0;
-			}
 			var dead_cells = place_room(room, map_grid);
 			var tries = 0;
 			while (!dead_cells) {
