@@ -1,32 +1,7 @@
 /* generates a map graph */
 $(function(){
  "use strict";
-<<<<<<< HEAD
 var globals = {},
-=======
-var globals = {
-	available_buildings : [
-		{name:"reactor", cost:50},
-		{name:"cooler", cost:100},
-		{name:"kitchen", cost:80},
-		{name:"breach", cost:-3, passable:true},
-		{name:"small_salvage", passable:true},
-		{name:"large_salvage", passable:true},
-		{name:"medium_salvage",  passable:true},
-		{name:"rubble", cost:10},
-		{name:"engine", cost:500},
-		{name:"autopilot", cost:2000},
-		{name:"terminal", cost:100},
-		{name:"food_generator", cost:20},
-		{name:"life_support", cost:50},
-		{name:"medical_bay", cost:150},
-		{name:"replicator", cost:150}
-    ],
-        available_equipment:[
-            {type:"power_glove", cost:10}
-        ]
-},
->>>>>>> 829ccdd... Added an equipment system
 defaults = {
 	background: 'white',
 	grid_offset:{"x":0, "y":0},
@@ -330,30 +305,8 @@ var core = {
 			{type:"wire_cutter", amount:1},
 			{type:"welder", amount:1},
 			{type:"wire", amount: 20},
-<<<<<<< HEAD
 			{type:"oxygen_tank", amount: 2}
-=======
-			{type:"oxygen_tank", amount: 2},
-			{type:"none", amount: 0},
-			{type:"none", amount: 0},
-			{type:"none", amount: 0},
-			{type:"none", amount: 0},
-			{type:"none", amount: 0},
-			{type:"none", amount: 0}
->>>>>>> 829ccdd... Added an equipment system
 		];
-       globals.equipment = [
-        {type:"none", amount:0},
-        {type:"none", amount:0},
-        {type:"none", amount:0},
-        {type:"none", amount:0},
-        {type:"none", amount: 0},
-        {type:"none", amount: 0},
-        {type:"none", amount: 0},
-        {type:"none", amount: 0},
-        {type:"none", amount: 0},
-        {type:"none", amount: 0}
-        ];
 		globals.inventory.add_item = function (type, amount) {
 			core.log("You have picked up " + type + " x " + amount);
 			var item = _.find(this, function (item) {
@@ -365,20 +318,6 @@ var core = {
 				this.push({type:type, amount:amount});
 			}
 		};
-       globals.equipment.equip_item = function (type ) {
-            if (_.findWhere(globals.equipment,{type:type})) {
-
-                core.log("You already have one of those on!");
-            } else {
-
-                var slot = _.findWhere(globals.equipment,{type:"none"})
-
-                slot.amount += 1;
-                slot.type = type;
-                core.log("You attach a " + slot.type+" to your butt");
-            }
-
-        };
 		globals.score = 0;
 		globals.timer = 0;
 		core.generate_map();
@@ -465,30 +404,6 @@ var core = {
 		$("#noise_slider").slider({max:100, min:0, step:1, value:5, slide:core.change_noise});
 		$("p#size_display").text("Light Size: " + globals.light_cone);
 		$("p#noise_display").text("Oxygen level: " + defaults.base_oxygen_level);
-<<<<<<< HEAD
-=======
-		var input_area = $('input#text_input');
-		var output_area = $('input#text_output');
-		input_area.bind("propertychange keyup input paste", function(event) {
-				var in_string = core.clean_build_string(input_area.val());
-				var building = _.findWhere(globals.available_buildings, {name:in_string});
-                var equipment = _.findWhere(globals.available_equipment, {type:in_string});
-				if (building && building.cost) {
-					output_area.val(building.cost);
-					globals.selected_building = building;
-				}
-                else if (equipment && equipment.cost) {
-                    output_area.val(equipment.cost);
-                    globals.selected_equipment = equipment;
-                }
-                else {
-					output_area.val("N/A");
-					globals.selected_building = undefined;
-                    globals.selected_equipment = undefined;
-				}
-			}
-		)
->>>>>>> 829ccdd... Added an equipment system
 
 		var ratio = core.hiDPIRatio();
 		if (ratio != 1) {
@@ -646,49 +561,9 @@ var core = {
 	toggle_door: function () {
 		var grid_point = core.screen_to_grid_index(globals.mousePos);
 		var next_cell = core.check_position(grid_point.x, grid_point.y);
-<<<<<<< HEAD
 		if (next_cell && next_cell.type == "door"
 		    		&& next_cell != globals.current_cell
 	    			&& !next_cell.wired) {
-=======
-		if (next_cell) {
-			if (next_cell.type == "door") {
-				core.toggle_door(next_cell);
-			}
-			else if (next_cell.type == "room") {
-				core.build(next_cell);
-
-			}
-		}
-	},
-	clean_build_string: function(str) {
-		return str.replace(" ", "_").toLowerCase();
-	},
-	build: function (cell) {
-		if (globals.selected_building) {
-			if (cell != globals.current_cell && cell.passable) {
-				if (globals.character.scraps >= globals.selected_building.cost) {
-					core.add_building(globals.selected_building.name,
-							  cell.x, cell.y);
-					globals.character.scraps -= globals.selected_building.cost;
-					core.log("You built a " + globals.selected_building.name
-						 + " with " + globals.selected_building.cost + " scraps.");
-					mapg.recalculate_power();
-				}
-			}
-		}
-        if(globals.selected_equipment){
-
-            if (globals.character.scraps >= globals.selected_equipment.cost) {
-                globals.equipment.equip_item(globals.selected_equipment.type);
-
-            }
-        }
-	},
-	toggle_door: function (cell) {
-		if (cell != globals.current_cell
-	    		&& !cell.wired) {
->>>>>>> 829ccdd... Added an equipment system
 			var collided = false;
 			for (var i = 0; i < globals.objs.length; i++) {
 				var obj = globals.objs[i];
@@ -1299,6 +1174,7 @@ var rooms = {
 		rooms.add_building(room, "life_support", 3, 5);
 		rooms.add_salvage(room, -3, 2);
 	},
+
 	default_function: function (room) {
 		var add_item = function (type, amount) {
 			var x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
@@ -1404,17 +1280,6 @@ var items = {
 		return 0;
 	}
 };
-var equipment = {
-        power_glove: function(equipment) {
-            item.in_use = !item.in_use;
-            if (item.in_use) {
-                globals.character.welder += 1;
-            } else {
-                globals.character.welder -= 1;
-            }
-            return 0;
-        }
-    };
 
 var utilities = {
 	dfs: function(root, adjacent) {
