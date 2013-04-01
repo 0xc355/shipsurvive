@@ -28,7 +28,7 @@ defaults = {
 	grid_offset:{"x":0, "y":0},
 	grid_width: 20,
 	breach_chance: .02,
-	base_oxygen_level: 5,
+	base_oxygen_level: 30,
 	room_min: 6,
 	room_max: 12,
 	font: 'Cutive Mono',
@@ -548,7 +548,7 @@ var core = {
 		};
 		globals.keys = {"w":false, "a":false, "s":false, "d":false};
 		globals.room_size = 50;
-		globals.light_cone = 200;
+		globals.light_cone = 10000;
 		globals.wires = [];
 		$("#size_slider").slider({max:360, min:0, step:1, value:globals.light_cone, slide:core.change_size});
 		$("#noise_slider").slider({max:100, min:0, step:1, value:5, slide:core.change_noise});
@@ -891,7 +891,7 @@ var core = {
 
 				var angle_opacity, distance_opacity, powered_opacity, occluded_opacity;
 				if (cell == globals.current_cell) {
-					angle_opacity = 0;
+					angle_opacity = .5;
 				} else if (light_max_dist != 0) {
 					angle_opacity = Math.pow(a_dist / (light_max_dist * powered_multiplier), 4);
 				} else {
@@ -907,8 +907,8 @@ var core = {
 						var g = globals.map_grid[mapg.indexof(n)];
 						return g && g.room && g.room.powered;}).length > 0;
 				}
-				powered_opacity = powered ? .5: 1;
-				occluded_opacity = occluded ? 1: 0;
+				powered_opacity = powered ? 1: 1;
+				occluded_opacity = occluded ? 0.5: 0;
 				o_cell.opacity = Math.min(Math.max(Math.min(angle_opacity, powered_opacity),
 								occluded_opacity),
 								distance_opacity);
@@ -1026,7 +1026,7 @@ var core = {
 		}
 		/* update the room and buildings */
 		globals.room_func.forEach(function (func) {func(dt);});
-		globals.rooms.forEach(function (room) {room.heat = 0;});
+		globals.rooms.forEach(function (room) {room.heat = .5;});
 		for (var i = 0; i < globals.objs.length; i++) {
 			var obj = globals.objs[i];
 			obj.update_function(dt);
@@ -1034,7 +1034,7 @@ var core = {
 		/* update character */
 		var moved_distance = dd.x != 0 || dd.y != 0 ? 1 : 0;
 		if (globals.character.hunger > 0) {
-			globals.character.hunger -= dt;
+			globals.character.hunger -= dt * 0.3;
 		} else {
 			globals.character.health -= dt * 3;
 			hunger_damage = true;
@@ -1075,7 +1075,7 @@ var core = {
 			}
 		}
 		if (globals.character.welder > 0 && welder_flame_pos) {
-			temperature += 2;
+			temperature += .05;
 			if (welder_flame_pos.door_health > 0) {
 				welder_flame_pos.door_health = Math.max(0, welder_flame_pos.door_health - dt);
 				if (welder_flame_pos.door_health == 0) {
@@ -1084,7 +1084,7 @@ var core = {
 			}
 			var heat = welder_flame_pos.room ? welder_flame_pos.room.heat : 0;
 			var heat_multiplier = Math.pow(2, heat) * 1;
-			var chance = welder_flame_pos.oxygen * dt * .0075 * heat_multiplier;
+			var chance = welder_flame_pos.oxygen * dt * .0003 * heat_multiplier;
 			if (Math.random() < chance) {
 				mapg.add_fire(welder_flame_pos);
 				core.log("Something caught on fire from welding!");
@@ -1279,11 +1279,11 @@ var buildings = {
 	},
 	breach: function(building) {
 		building.set_passable(true);
-		building.hp = 5;
+		building.hp = 2;
 		building.min_scrap = 0;
 		building.max_scrap = 0;
 		return function (dt) {
-			building.cell.oxygen = Math.max(-20, building.cell.oxygen - 20 * dt);
+			building.cell.oxygen = Math.max(-50, building.cell.oxygen - 50 * dt);
 		}
 	},
 	cooler: function(building) {
@@ -1298,7 +1298,7 @@ var buildings = {
 	},
 	reactor: function(building) {
 		building.power = 50;
-		var reactor_heat = .1;
+		var reactor_heat = .03;
 		building.die = function () {
 			mapg.add_fire(building.cell);
 		}
@@ -1439,7 +1439,9 @@ var rooms = {
 		if (Math.random() < .2) {
 			rooms.add_building(room, "replicator", 1, 1);
 		}
-		rooms.add_building(room, "breach", -5, 5);
+        if (Math.random() < .4){
+		rooms.add_building(room, "breach", 0, 4);
+        }
 	}
 };
 var items = {
