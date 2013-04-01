@@ -5,7 +5,7 @@ var globals = {
 	available_buildings : [
 		{name:"reactor", cost:50},
 		{name:"cooler", cost:100},
-		{name:"kitchen", cost:80},
+		{name:"kitchen", cost:70},
 		{name:"breach", cost:-3, passable:true},
 		{name:"small_salvage", passable:true},
 		{name:"large_salvage", passable:true},
