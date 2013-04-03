@@ -28,7 +28,7 @@ defaults = {
 	grid_offset:{"x":0, "y":0},
 	grid_width: 20,
 	breach_chance: .02,
-	base_oxygen_level: 30,
+	base_oxygen_level: 10,
 	room_min: 6,
 	room_max: 12,
 	font: 'Cutive Mono',
@@ -1074,6 +1074,9 @@ var core = {
 				original_cell.oxygen -= oxygen_supplied;
 			}
 		}
+        if (original_cell.oxygen < 0) {
+            original_cell.oxygen = 0;
+        }
 		if (globals.character.welder > 0 && welder_flame_pos) {
 			temperature += .05;
 			if (welder_flame_pos.door_health > 0) {
@@ -1157,7 +1160,7 @@ var core = {
 
 var buildings = {
 	rubble: function(building) {
-		return buildings.generic_salvage(building, 3, 1, 1);
+		return buildings.generic_salvage(building, 1.0, 1, 1);
 	},
 	autopilot: function(building) {
 		building.power = -100;
@@ -1186,13 +1189,13 @@ var buildings = {
 		};
 	},
 	small_salvage: function(building) {
-		return buildings.generic_salvage(building, 1, 1, 3, true);
+		return buildings.generic_salvage(building, 0.25, 1, 3, true);
 	},
 	medium_salvage: function(building) {
-		return buildings.generic_salvage(building, 1.5, 3, 7, true);
+		return buildings.generic_salvage(building, 0.5, 3, 7, true);
 	},
 	large_salvage: function(building) {
-		return buildings.generic_salvage(building, 3, 5, 10, true);
+		return buildings.generic_salvage(building, 1.0, 5, 10, true);
 	},
 	terminal: function(building) {
 		building.power = -25;
@@ -1211,7 +1214,7 @@ var buildings = {
 		return function (dt) {
 			var cell = building.cell;
 			var powered = cell.powered;
-			var multiplier = powered ? 10 : 3;
+			var multiplier = powered ? 500: 25;
 			cell.oxygen = Math.min(cell.oxygen + dt * multiplier/3, 5 * multiplier);
 		};
 	},
@@ -1279,11 +1282,11 @@ var buildings = {
 	},
 	breach: function(building) {
 		building.set_passable(true);
-		building.hp = 2;
+		building.hp = 1.0;
 		building.min_scrap = 0;
 		building.max_scrap = 0;
 		return function (dt) {
-			building.cell.oxygen = Math.max(-50, building.cell.oxygen - 50 * dt);
+			building.cell.oxygen = Math.max(-50, building.cell.oxygen - 500 * dt);
 		}
 	},
 	cooler: function(building) {
@@ -1439,7 +1442,7 @@ var rooms = {
 		if (Math.random() < .2) {
 			rooms.add_building(room, "replicator", 1, 1);
 		}
-        if (Math.random() < .4){
+        if (Math.random() < .25){
 		rooms.add_building(room, "breach", 0, 4);
         }
 	}
