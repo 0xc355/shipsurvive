@@ -504,10 +504,12 @@ var core = {
 		globals.character.max_hunger = 100;
 		globals.character.max_oxygen = 5;
 		globals.character.max_temperature = 40;
+        globals.character.max_tank_oxygen = 30
 		globals.character.temperature = globals.character.max_temperature/2;
 		globals.character.health = globals.character.max_health;
 		globals.character.hunger = globals.character.max_hunger;
 		globals.character.oxygen = globals.character.max_oxygen;
+        globals.character.tank_oxygen = 0;
 		globals.character.scraps = 10;
 		globals.room_func = [];
 		globals.rooms.forEach(function (room) {
@@ -970,6 +972,9 @@ var core = {
 		draw_functions.draw_healthbar(globals.context, "#BB00BB",
 					globals.character.oxygen/globals.character.max_oxygen,
 					{x:globals.screen_bounds.size.width - 65, y:30});
+        draw_functions.draw_healthbar(globals.context, "#9df1fe",
+            globals.character.tank_oxygen/globals.character.max_tank_oxygen,
+            {x:globals.screen_bounds.size.width - 80, y:30});
 		draw_functions.draw_inventory(globals.context, globals.inventory, 50);
 		draw_functions.draw_overlay(globals.context, "rgba(255,0,0," +globals.red_overlay_alpha + ")");
 		draw_functions.draw_border(globals.context, 2);
@@ -1102,12 +1107,17 @@ var core = {
 			}
 			/*oxygen_req += dt * 1;   */
 		}
-		if (oxygen_req > 0) {
+        if (oxygen_req > 0 && globals.character.tank_oxygen > 0) {
+          var oxygen_taken = Math.min(oxygen_req, globals.character.tank_oxygen);
+           globals.character.tank_oxygen -= oxygen_taken;
+           oxygen_req -= oxygen_taken;
+       }
+		if (oxygen_req > 0 && globals.character.tank_oxygen == 0) {
 			var oxygen_taken = Math.min(oxygen_req, globals.character.oxygen);
 			globals.character.oxygen -= oxygen_taken;
 			oxygen_req -= oxygen_taken;
 		}
-		if (oxygen_req > 0) {
+		if (oxygen_req > 0 && globals.character.tank_oxygen == 0) {
 			globals.character.health -= oxygen_req * 5;
 			oxygen_damage = true;
 		}
@@ -1473,9 +1483,9 @@ var items = {
 		return 0;
 	},
 	oxygen_tank: function(item) {
-		var amount = item.quality || 25;
-		if (globals.character.oxygen < globals.character.max_oxygen - 1) {
-			globals.character.oxygen = Math.min(globals.character.max_oxygen, globals.character.oxygen + amount);
+		var amount = item.quality || 100;
+		if (globals.character.tank_oxygen < globals.character.max_tank_oxygen) {
+			globals.character.tank_oxygen = Math.min(globals.character.max_tank_oxygen, globals.character.tank_oxygen + amount);
 			globals.inventory.add_item("empty_tank", 1);
 			return 1;
 		}
