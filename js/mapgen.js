@@ -22,7 +22,9 @@ var globals = {
 
     ],
         available_equipment:[
-            {type:"power_glove", cost:10}
+            {type:"power_glove", cost:10},
+            {type:"oxygen_tank", cost: 10}
+
         ]
 },
 defaults = {
@@ -422,7 +424,7 @@ var core = {
 			{type:"wire_cutter", amount:1},
 			{type:"welder", amount:1},
 			{type:"wire", amount: 20},
-			{type:"oxygen_tank", amount: 2},
+			{type:"none", amount: 0},
 			{type:"none", amount: 0},
 			{type:"none", amount: 0},
 			{type:"none", amount: 0},
@@ -469,6 +471,7 @@ var core = {
                 slot.amount += 1;
                 slot.type = type;
                 core.log("You attach a " + slot.type+" to your double butt");
+
             }
 
         };
@@ -780,7 +783,9 @@ var core = {
         if(globals.selected_equipment){
 
             if (globals.character.scraps >= globals.selected_equipment.cost) {
-                globals.equipment.equip_item(globals.selected_equipment.type);
+                globals.character.scraps -= globals.selected_equipment.cost
+                globals.inventory.add_item(globals.selected_equipment.type, 1);
+
 
             }
         }
@@ -1446,7 +1451,7 @@ var rooms = {
 		while(Math.random() < .5) {
 			add_item("wire",utilities.random_interval(1,5));
 		}
-		while(Math.random() < .2) {
+		while(Math.random() < .1) {
 			add_item("oxygen_tank",1);
 		}
 		while(Math.random() < .2) {

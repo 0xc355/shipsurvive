@@ -35,7 +35,7 @@
       <file leaf-file-name="mapgen.js" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/mapgen.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="1468" column="5" selection-start="48144" selection-end="48144" vertical-scroll-proportion="0.5338912">
+            <state line="791" column="6" selection-start="24894" selection-end="24894" vertical-scroll-proportion="0.5841004">
               <folding>
                 <element signature="n#!!doc" expanded="true" />
               </folding>
@@ -385,7 +385,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/mapgen.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="1468" column="5" selection-start="48144" selection-end="48144" vertical-scroll-proportion="0.5338912">
+        <state line="791" column="6" selection-start="24894" selection-end="24894" vertical-scroll-proportion="0.5841004">
           <folding>
             <element signature="n#!!doc" expanded="true" />
           </folding>
