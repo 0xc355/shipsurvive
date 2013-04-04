@@ -23,7 +23,7 @@ var globals = {
     ],
         available_equipment:[
             {type:"power_glove", cost:10},
-            {type:"oxygen_tank", cost: 10}
+            {type:"oxygen_tank", cost: 100}
 
         ]
 },
