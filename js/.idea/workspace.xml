@@ -5,7 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="1dde62bf-ebf4-4da4-8b81-5a094a743308" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/mapgen.js" afterPath="$PROJECT_DIR$/mapgen.js" />
     </list>
     <ignored path="js.iws" />
@@ -35,7 +34,7 @@
       <file leaf-file-name="mapgen.js" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/mapgen.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="791" column="6" selection-start="24894" selection-end="24894" vertical-scroll-proportion="0.5841004">
+            <state line="1193" column="32" selection-start="39879" selection-end="39879" vertical-scroll-proportion="0.4585774">
               <folding>
                 <element signature="n#!!doc" expanded="true" />
               </folding>
@@ -385,7 +384,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/mapgen.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="791" column="6" selection-start="24894" selection-end="24894" vertical-scroll-proportion="0.5841004">
+        <state line="1193" column="32" selection-start="39879" selection-end="39879" vertical-scroll-proportion="0.4585774">
           <folding>
             <element signature="n#!!doc" expanded="true" />
           </folding>

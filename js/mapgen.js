@@ -1183,7 +1183,7 @@ var core = {
 
 var buildings = {
 	rubble: function(building) {
-		return buildings.generic_salvage(building, 1.0, 1, 1);
+		return buildings.generic_salvage(building, 1.0, 1, 5);
 	},
 	autopilot: function(building) {
 		building.power = -100;
