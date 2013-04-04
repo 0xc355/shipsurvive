@@ -468,7 +468,7 @@ var core = {
 
                 slot.amount += 1;
                 slot.type = type;
-                core.log("You attach a " + slot.type+" to your butt");
+                core.log("You attach a " + slot.type+" to your double butt");
             }
 
         };
