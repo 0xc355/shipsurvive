@@ -256,15 +256,20 @@ var core = {
 				if (globals.character.welder) {
 					var flame_pos = globals.character.get_welder_flame();
 					var in_flame = flame_pos.equals(this.cell);
-				} else {
-					var in_flame = false;
-				}
+                    var damage = 0;
+				} else if (globals.character.punch){
+                    var glove_pos=globals.character.get_welder_flame();
+                    var in_glove = glove_pos.equals(this.cell);
+
+                }
+                else { var in_flame=false;
+                }
 
 				var cpos = globals.character.cell;
 				var inside = cpos.equals(this.cell);
 
 				this.hp -= dt * (in_flame * 1 + inside * .33);
-				if (this.hp <= 0) {
+				if (this.hp <= 0||in_glove==true) {
 					core.remove_building(this);
 					if (!this.passable)
 						this.cell.passable = true;
@@ -378,6 +383,7 @@ var core = {
 						this.health = this.max_health;
 						this.random_room();
 					}
+
 				} else if (this.cell == globals.character.cell) {
 					globals.red_overlay_alpha = .7;
 					globals.character.health -= 25;
@@ -504,6 +510,7 @@ var core = {
 			return mapg.cell_at(globals.character.cell.x + dx,
 					    globals.character.cell.y + dy);
 		};
+        globals.character.punch = 0;
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
 		globals.character.max_oxygen = 5;
@@ -1549,16 +1556,14 @@ var items = {
     power_glove: function(item) {
         item.in_use = !item.in_use;
         if (item.in_use) {
-            globals.character.welder += 1;
+            globals.character.punch += 1;
         } else {
-            globals.character.welder -= 1;
+            globals.character.punch -= 1;
         }
         return 0;
     }
 };
-var equipment = {
 
-    };
 
 var utilities = {
 	round: function (num, decimal) {
