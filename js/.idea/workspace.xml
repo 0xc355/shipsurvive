@@ -7,7 +7,7 @@
     <list default="true" id="1dde62bf-ebf4-4da4-8b81-5a094a743308" name="Default" comment="" />
     <ignored path="js.iws" />
     <ignored path=".idea/workspace.xml" />
-    <file path="/mapgen.js" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1365150284233" ignored="false" />
+    <file path="/mapgen.js" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1365154589156" ignored="false" />
     <file path="/mapgen-eden.js" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1364102819340" ignored="false" />
     <file path="/Dummy.txt" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1365142758684" ignored="false" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -32,19 +32,17 @@
       <file leaf-file-name="mapgen.js" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/mapgen.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="1556" column="35" selection-start="50889" selection-end="50889" vertical-scroll-proportion="0.67395264">
+            <state line="1071" column="82" selection-start="35986" selection-end="35986" vertical-scroll-proportion="0.5500911">
               <folding>
                 <element signature="n#!!doc" expanded="true" />
                 <element signature="e#96#617#0" expanded="false" />
-                <element signature="e#647#746#0" expanded="false" />
-                <element signature="e#761#928#0" expanded="false" />
-                <element signature="e#48650#48805#0" expanded="false" />
-                <element signature="e#48835#49001#0" expanded="false" />
-                <element signature="e#49032#49344#0" expanded="false" />
-                <element signature="e#49370#49520#0" expanded="false" />
-                <element signature="e#49548#49710#0" expanded="false" />
-                <element signature="e#49735#50245#0" expanded="false" />
-                <element signature="e#50277#50818#0" expanded="false" />
+                <element signature="e#799#966#0" expanded="false" />
+                <element signature="e#48918#49073#0" expanded="false" />
+                <element signature="e#49103#49269#0" expanded="false" />
+                <element signature="e#49300#49612#0" expanded="false" />
+                <element signature="e#49638#49788#0" expanded="false" />
+                <element signature="e#49816#49978#0" expanded="false" />
+                <element signature="e#50545#51086#0" expanded="false" />
               </folding>
             </state>
           </provider>
@@ -209,7 +207,7 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1936" height="1056" extended-state="7" />
+    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
     <editor active="true" />
     <layout>
       <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
@@ -290,7 +288,7 @@
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="7" />
+      <option name="time" value="8" />
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
@@ -328,15 +326,13 @@
           <folding>
             <element signature="n#!!doc" expanded="true" />
             <element signature="e#96#617#0" expanded="false" />
-            <element signature="e#647#746#0" expanded="false" />
-            <element signature="e#761#928#0" expanded="false" />
-            <element signature="e#48650#48805#0" expanded="false" />
-            <element signature="e#48835#49001#0" expanded="false" />
-            <element signature="e#49032#49344#0" expanded="false" />
-            <element signature="e#49370#49520#0" expanded="false" />
-            <element signature="e#49548#49710#0" expanded="false" />
-            <element signature="e#49735#50245#0" expanded="false" />
-            <element signature="e#50277#50818#0" expanded="false" />
+            <element signature="e#799#966#0" expanded="false" />
+            <element signature="e#48918#49073#0" expanded="false" />
+            <element signature="e#49103#49269#0" expanded="false" />
+            <element signature="e#49300#49612#0" expanded="false" />
+            <element signature="e#49638#49788#0" expanded="false" />
+            <element signature="e#49816#49978#0" expanded="false" />
+            <element signature="e#50545#51086#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -375,15 +371,13 @@
           <folding>
             <element signature="n#!!doc" expanded="true" />
             <element signature="e#96#617#0" expanded="false" />
-            <element signature="e#647#746#0" expanded="false" />
-            <element signature="e#761#928#0" expanded="false" />
-            <element signature="e#48650#48805#0" expanded="false" />
-            <element signature="e#48835#49001#0" expanded="false" />
-            <element signature="e#49032#49344#0" expanded="false" />
-            <element signature="e#49370#49520#0" expanded="false" />
-            <element signature="e#49548#49710#0" expanded="false" />
-            <element signature="e#49735#50245#0" expanded="false" />
-            <element signature="e#50277#50818#0" expanded="false" />
+            <element signature="e#799#966#0" expanded="false" />
+            <element signature="e#48918#49073#0" expanded="false" />
+            <element signature="e#49103#49269#0" expanded="false" />
+            <element signature="e#49300#49612#0" expanded="false" />
+            <element signature="e#49638#49788#0" expanded="false" />
+            <element signature="e#49816#49978#0" expanded="false" />
+            <element signature="e#50545#51086#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -425,19 +419,17 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/mapgen.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="1556" column="35" selection-start="50889" selection-end="50889" vertical-scroll-proportion="0.67395264">
+        <state line="1071" column="82" selection-start="35986" selection-end="35986" vertical-scroll-proportion="0.5500911">
           <folding>
             <element signature="n#!!doc" expanded="true" />
             <element signature="e#96#617#0" expanded="false" />
-            <element signature="e#647#746#0" expanded="false" />
-            <element signature="e#761#928#0" expanded="false" />
-            <element signature="e#48650#48805#0" expanded="false" />
-            <element signature="e#48835#49001#0" expanded="false" />
-            <element signature="e#49032#49344#0" expanded="false" />
-            <element signature="e#49370#49520#0" expanded="false" />
-            <element signature="e#49548#49710#0" expanded="false" />
-            <element signature="e#49735#50245#0" expanded="false" />
-            <element signature="e#50277#50818#0" expanded="false" />
+            <element signature="e#799#966#0" expanded="false" />
+            <element signature="e#48918#49073#0" expanded="false" />
+            <element signature="e#49103#49269#0" expanded="false" />
+            <element signature="e#49300#49612#0" expanded="false" />
+            <element signature="e#49638#49788#0" expanded="false" />
+            <element signature="e#49816#49978#0" expanded="false" />
+            <element signature="e#50545#51086#0" expanded="false" />
           </folding>
         </state>
       </provider>

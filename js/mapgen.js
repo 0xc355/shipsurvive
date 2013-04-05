@@ -23,7 +23,8 @@ var globals = {
     ],
         available_equipment:[
             {type:"power_glove", cost:10},
-            {type:"oxygen_tank", cost: 100}
+            {type:"oxygen_tank", cost: 100},
+            {type:"helmet", cost:10}
 
         ]
 },
@@ -67,6 +68,7 @@ var core = {
 		core.load_image("medipack");
         core.load_image("power_glove", false);
 		core.load_image("wire");
+        core.load_image("helmet", false);
 		core.load_image("wire_cutter", false);
 		core.load_image("oxygen_tank");
 		core.load_image("empty_tank");
@@ -511,6 +513,7 @@ var core = {
 					    globals.character.cell.y + dy);
 		};
         globals.character.punch = 0;
+        globals.character.helmet = 0;
 		globals.character.max_health = 100;
 		globals.character.max_hunger = 100;
 		globals.character.max_oxygen = 5;
@@ -1065,7 +1068,10 @@ var core = {
 		}
 		var m_temp = globals.character.max_temperature;
 		var temperature = 0;
-		var oxygen_req = dt * (.5 + moved_distance);
+        if (globals.character.helmet>0)
+		var oxygen_req = dt * (.5 + moved_distance)*(1/(globals.character.helmet+3));
+        else
+            var oxygen_req = dt * (.5 + moved_distance);
 
 		var welder_flame_pos = globals.character.get_welder_flame();
 
@@ -1127,7 +1133,7 @@ var core = {
        }
 		if (oxygen_req > 0 && globals.character.tank_oxygen == 0) {
 			var oxygen_taken = Math.min(oxygen_req, globals.character.oxygen);
-			globals.character.oxygen -= oxygen_taken;
+            globals.character.oxygen-=oxygen_taken;
 			oxygen_req -= oxygen_taken;
 		}
 		if (oxygen_req > 0 && globals.character.tank_oxygen == 0) {
@@ -1561,6 +1567,15 @@ var items = {
             globals.character.punch -= 1;
         }
         return 0;
+    },
+    helmet: function(item) {
+        item.in_use = !item.in_use;
+        if (item.in_use) {
+            globals.character.helmet += 1;
+        } else {
+            globals.character.helmet -= 1;
+        }
+
     }
 };
 
