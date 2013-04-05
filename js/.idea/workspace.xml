@@ -4,14 +4,12 @@
     <bookmark url="file://$PROJECT_DIR$" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1dde62bf-ebf4-4da4-8b81-5a094a743308" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/mapgen.js" afterPath="$PROJECT_DIR$/mapgen.js" />
-    </list>
+    <list default="true" id="1dde62bf-ebf4-4da4-8b81-5a094a743308" name="Default" comment="" />
     <ignored path="js.iws" />
     <ignored path=".idea/workspace.xml" />
-    <file path="/mapgen.js" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1364278091234" ignored="false" />
+    <file path="/mapgen.js" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1365132593346" ignored="false" />
     <file path="/mapgen-eden.js" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1364102819340" ignored="false" />
-    <file path="/Dummy.txt" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1365055979010" ignored="false" />
+    <file path="/Dummy.txt" changelist="1dde62bf-ebf4-4da4-8b81-5a094a743308" time="1365129203684" ignored="false" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -34,9 +32,18 @@
       <file leaf-file-name="mapgen.js" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/mapgen.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="11" column="16" selection-start="280" selection-end="280" vertical-scroll-proportion="0.22664835">
+            <state line="1552" column="60" selection-start="50675" selection-end="50675" vertical-scroll-proportion="0.39512196">
               <folding>
                 <element signature="n#!!doc" expanded="true" />
+                <element signature="e#761#928#0" expanded="false" />
+                <element signature="e#48349#48504#0" expanded="false" />
+                <element signature="e#48534#48700#0" expanded="false" />
+                <element signature="e#48731#49043#0" expanded="false" />
+                <element signature="e#49247#49409#0" expanded="false" />
+                <element signature="e#49434#49944#0" expanded="false" />
+                <element signature="e#49976#50517#0" expanded="false" />
+                <element signature="e#50799#53452#0" expanded="false" />
+                <element signature="e#73288#82758#0" expanded="false" />
               </folding>
             </state>
           </provider>
@@ -66,10 +73,10 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="79" />
-    <option name="y" value="202" />
-    <option name="width" value="1406" />
-    <option name="height" value="874" />
+    <option name="x" value="-8" />
+    <option name="y" value="-8" />
+    <option name="width" value="1936" />
+    <option name="height" value="1056" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
     <OptionsSetting value="true" id="Add" />
@@ -97,6 +104,7 @@
       <sortByType />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -131,7 +139,6 @@
           </PATH>
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -201,13 +208,13 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="79" y="202" width="1406" height="874" extended-state="0" />
-    <editor active="true" />
+    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <editor active="false" />
     <layout>
       <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32954547" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.28488794" sideWeight="0.998414" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.28465998" sideWeight="0.998414" order="0" side_tool="false" content_ui="combo" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33068183" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
@@ -282,7 +289,7 @@
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="6" />
+      <option name="time" value="7" />
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
@@ -319,6 +326,15 @@
         <state line="469" column="7" selection-start="14557" selection-end="14557" vertical-scroll-proportion="0.0">
           <folding>
             <element signature="n#!!doc" expanded="true" />
+            <element signature="e#761#928#0" expanded="false" />
+            <element signature="e#48349#48504#0" expanded="false" />
+            <element signature="e#48534#48700#0" expanded="false" />
+            <element signature="e#48731#49043#0" expanded="false" />
+            <element signature="e#49247#49409#0" expanded="false" />
+            <element signature="e#49434#49944#0" expanded="false" />
+            <element signature="e#49976#50517#0" expanded="false" />
+            <element signature="e#50799#53452#0" expanded="false" />
+            <element signature="e#73288#82758#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -356,6 +372,15 @@
         <state line="775" column="11" selection-start="24620" selection-end="24620" vertical-scroll-proportion="0.0">
           <folding>
             <element signature="n#!!doc" expanded="true" />
+            <element signature="e#761#928#0" expanded="false" />
+            <element signature="e#48349#48504#0" expanded="false" />
+            <element signature="e#48534#48700#0" expanded="false" />
+            <element signature="e#48731#49043#0" expanded="false" />
+            <element signature="e#49247#49409#0" expanded="false" />
+            <element signature="e#49434#49944#0" expanded="false" />
+            <element signature="e#49976#50517#0" expanded="false" />
+            <element signature="e#50799#53452#0" expanded="false" />
+            <element signature="e#73288#82758#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -397,9 +422,18 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/mapgen.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="11" column="16" selection-start="280" selection-end="280" vertical-scroll-proportion="0.22664835">
+        <state line="1552" column="60" selection-start="50675" selection-end="50675" vertical-scroll-proportion="0.39512196">
           <folding>
             <element signature="n#!!doc" expanded="true" />
+            <element signature="e#761#928#0" expanded="false" />
+            <element signature="e#48349#48504#0" expanded="false" />
+            <element signature="e#48534#48700#0" expanded="false" />
+            <element signature="e#48731#49043#0" expanded="false" />
+            <element signature="e#49247#49409#0" expanded="false" />
+            <element signature="e#49434#49944#0" expanded="false" />
+            <element signature="e#49976#50517#0" expanded="false" />
+            <element signature="e#50799#53452#0" expanded="false" />
+            <element signature="e#73288#82758#0" expanded="false" />
           </folding>
         </state>
       </provider>

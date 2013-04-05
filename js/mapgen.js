@@ -65,6 +65,7 @@ var core = {
 		core.load_image("welder_fire", true);
 		core.load_image("welder_fire_small", true);
 		core.load_image("medipack");
+        core.load_image("power_glove", false);
 		core.load_image("wire");
 		core.load_image("wire_cutter", false);
 		core.load_image("oxygen_tank");
@@ -1544,18 +1545,19 @@ var items = {
 			}
 		}
 		return 0;
-	}
+	},
+    power_glove: function(item) {
+        item.in_use = !item.in_use;
+        if (item.in_use) {
+            globals.character.welder += 1;
+        } else {
+            globals.character.welder -= 1;
+        }
+        return 0;
+    }
 };
 var equipment = {
-        power_glove: function(equipment) {
-            item.in_use = !item.in_use;
-            if (item.in_use) {
-                globals.character.welder += 1;
-            } else {
-                globals.character.welder -= 1;
-            }
-            return 0;
-        }
+
     };
 
 var utilities = {
