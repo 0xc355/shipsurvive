@@ -24,8 +24,9 @@ var globals = {
         available_equipment:[
             {type:"power_glove", cost:10},
             {type:"oxygen_tank", cost: 100},
-            {type:"helmet", cost:10}
-
+            {type:"helmet", cost:10},
+            {type:"suit", cost:10},
+            {type:"shoes", cost:10}
         ]
 },
 defaults = {
@@ -67,7 +68,8 @@ var core = {
 		core.load_image("welder_fire_small", true);
 		core.load_image("medipack");
         core.load_image("power_glove", false);
-		core.load_image("wire");
+        core.load_image("shoes", false);
+        core.load_image("wire");
         core.load_image("helmet", false);
 		core.load_image("wire_cutter", false);
 		core.load_image("oxygen_tank");
@@ -221,7 +223,7 @@ var core = {
 				return next_room;
 			},
 			move: function(x, y) {
-				var new_origin = {x:this.origin.x+x, y:this.origin.y+y};
+				var new_origin = globals.character.shoes?{x:this.origin.x+(x *1.5), y:this.origin.y+(1.5*y)}:{x:this.origin.x+x, y:this.origin.y+y};
 				var x = Math.floor((new_origin.x)/defaults.grid_width);
 				var y = Math.floor((new_origin.y)/defaults.grid_width);
 				var next_room = core.check_position(x,y);
@@ -292,7 +294,7 @@ var core = {
 						this.push_timer += dt;
 						if (this.push_timer > this.weight) {
 							var dx = this.cell.x - globals.character.cell.x;
-							var dy = this.cell.y - globals.character.cell.y; 
+							var dy = this.cell.y - globals.character.cell.y;
 							this.dtarg.x = (this.cell.x + dx)
 								* defaults.grid_width;
 							this.dtarg.y = (this.cell.y + dy)
@@ -512,6 +514,7 @@ var core = {
 			return mapg.cell_at(globals.character.cell.x + dx,
 					    globals.character.cell.y + dy);
 		};
+        globals.character.shoes = 0;
         globals.character.punch = 0;
         globals.character.helmet = 0;
 		globals.character.max_health = 100;
@@ -525,6 +528,7 @@ var core = {
 		globals.character.oxygen = globals.character.max_oxygen;
         globals.character.tank_oxygen = 0;
 		globals.character.scraps = 10;
+        globals.character.suit = 0;
 		globals.room_func = [];
 		globals.rooms.forEach(function (room) {
 			if (rooms[room.type]) {
@@ -543,7 +547,7 @@ var core = {
 		core.load_classes();
 		globals.canvas = $('#board');
 		var cv = globals.canvas[0];
-		
+
 		globals.red_overlay_alpha = 0;
 		globals.room_data = room_data;
 		cv.onselectstart = function () { return false; }
@@ -630,16 +634,16 @@ var core = {
 		cv.addEventListener('mousemove', function(evt) {
 			if (globals.pause) {return;}
 			globals.mousePos = getMousePos(cv, evt);
-			globals.character.facing = 
+			globals.character.facing =
 				Math.atan2(globals.mousePos.y - globals.centroid.y,
 					 globals.mousePos.x - globals.centroid.x);
 		}, false);
 		window.requestAnimFrame = (function(){
-			return  window.requestAnimationFrame       || 
-					window.webkitRequestAnimationFrame || 
-					window.mozRequestAnimationFrame    || 
-					window.oRequestAnimationFrame      || 
-					window.msRequestAnimationFrame     || 
+			return  window.requestAnimationFrame       ||
+					window.webkitRequestAnimationFrame ||
+					window.mozRequestAnimationFrame    ||
+					window.oRequestAnimationFrame      ||
+					window.msRequestAnimationFrame     ||
 			function( callback ){
 				window.setTimeout(callback, 1000 / 60);
 			};
@@ -708,7 +712,7 @@ var core = {
 	},
 	keydown_handler: function (evt) {
 		var code = evt.keyCode;
-		if (code == 87) {globals.keys["w"] = true;} 
+		if (code == 87) {globals.keys["w"] = true;}
 		if (code == 65) {globals.keys["a"] = true;}
 		if (code == 83) {globals.keys["s"] = true;}
 		if (code == 68) {globals.keys["d"] = true;}
@@ -729,7 +733,7 @@ var core = {
 	},
 	keyup_handler: function (evt) {
 		var code = evt.keyCode;
-		if (code == 87) {globals.keys["w"] = false;} 
+		if (code == 87) {globals.keys["w"] = false;}
 		if (code == 65) {globals.keys["a"] = false;}
 		if (code == 83) {globals.keys["s"] = false;}
 		if (code == 68) {globals.keys["d"] = false;}
@@ -908,7 +912,7 @@ var core = {
 				}
 				var angle = Math.atan2(y - globals.current_cell.y, x - globals.current_cell.x);
 				var a_dist = utilities.angular_distance(globals.character.facing, angle);
-				var powered_multiplier = cell.room && cell.room.powered ? 1.: .5; 
+				var powered_multiplier = cell.room && cell.room.powered ? 1.: .5;
 				var occluded = mapg.occluded(globals.current_cell, o_cell);
 				var m_dist = mapg.m_dist(globals.current_cell, o_cell);
 
@@ -1085,7 +1089,7 @@ var core = {
 			var rooms = _.map(neighbors, function (cell) {return cell.room;});
 			var temp = 0
 			rooms.forEach(function (room) {temp += room.powered ? 1 : 0;});
-			temperature += temp / rooms.length; 
+			temperature += temp / rooms.length;
 		}
 		temperature += moved_distance / 2;
 		temperature += globals.character.cell.fire ? 10 : 0;
@@ -1149,7 +1153,7 @@ var core = {
 		globals.character.temperature = Math.min(Math.max(0,
 						globals.character.temperature + (temperature - .5) * dt),
 						m_temp);
-	
+
 		if (globals.character.temperature < m_temp * .2) {
 			globals.character.health -= ((m_temp * .2) - globals.character.temperature) * 2 * dt;
 			cold_damage = true;
@@ -1385,7 +1389,7 @@ var rooms = {
 				x = room.origin.x + utilities.random_interval(0, room.dimensions.width);
 				y = room.origin.y + utilities.random_interval(0, room.dimensions.height);
 				count -= 1;
-				if (count == 0) {return;} 
+				if (count == 0) {return;}
 			}
 			core.add_building(building,x,y);
 		}
@@ -1568,6 +1572,15 @@ var items = {
         }
         return 0;
     },
+    suit: function(item) {
+        item.in_use = !item.in_use;
+        if (item.in_use) {
+            globals.character.suit += 1;
+        } else {
+            globals.character.suit -= 1;
+        }
+
+    },
     helmet: function(item) {
         item.in_use = !item.in_use;
         if (item.in_use) {
@@ -1576,8 +1589,17 @@ var items = {
             globals.character.helmet -= 1;
         }
 
+    },
+    shoes: function(item) {
+        item.in_use = !item.in_use;
+        if (item.in_use) {
+            globals.character.shoes += 1;
+        } else {
+            globals.character.shoes -= 1;
+        }
     }
-};
+
+    };
 
 
 var utilities = {
